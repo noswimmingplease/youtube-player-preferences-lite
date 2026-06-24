@@ -128,9 +128,9 @@
         box-sizing: border-box !important;
         background: transparent !important;
         box-shadow: none !important;
-        color: #ffff00 !important;
+        color: #fff4a8 !important;
         font: 800 42px/1.1 "Segoe UI Variable Display", "Segoe UI", Roboto, Arial, Helvetica, sans-serif !important;
-        -webkit-text-fill-color: #ffff00 !important;
+        -webkit-text-fill-color: #fff4a8 !important;
         -webkit-text-stroke: 2.4px rgba(0, 0, 0, 0.88) !important;
         letter-spacing: 0 !important;
         text-align: center !important;
