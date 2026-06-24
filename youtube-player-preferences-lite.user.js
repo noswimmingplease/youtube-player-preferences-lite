@@ -129,19 +129,19 @@
         background: transparent !important;
         box-shadow: none !important;
         color: #fff !important;
-        font: 800 22px/1.2 Arial, Helvetica, sans-serif !important;
+        font: 800 34px/1.1 "Segoe UI Variable Display", "Segoe UI", Roboto, Arial, Helvetica, sans-serif !important;
         letter-spacing: 0 !important;
         text-align: center !important;
         text-shadow:
-          -2px -2px 0 rgba(0, 0, 0, 0.92),
-           0   -2px 0 rgba(0, 0, 0, 0.92),
-           2px -2px 0 rgba(0, 0, 0, 0.92),
-          -2px  0   0 rgba(0, 0, 0, 0.92),
-           2px  0   0 rgba(0, 0, 0, 0.92),
-          -2px  2px 0 rgba(0, 0, 0, 0.92),
-           0    2px 0 rgba(0, 0, 0, 0.92),
-           2px  2px 0 rgba(0, 0, 0, 0.92),
-           0    4px 10px rgba(0, 0, 0, 0.7) !important;
+          -3px -3px 0 rgba(0, 0, 0, 0.9),
+           0   -3px 0 rgba(0, 0, 0, 0.9),
+           3px -3px 0 rgba(0, 0, 0, 0.9),
+          -3px  0   0 rgba(0, 0, 0, 0.9),
+           3px  0   0 rgba(0, 0, 0, 0.9),
+          -3px  3px 0 rgba(0, 0, 0, 0.9),
+           0    3px 0 rgba(0, 0, 0, 0.9),
+           3px  3px 0 rgba(0, 0, 0, 0.9),
+           0    5px 16px rgba(0, 0, 0, 0.75) !important;
         white-space: nowrap !important;
         opacity: 0 !important;
         pointer-events: none !important;
@@ -289,12 +289,12 @@
   function showVolumeOverlay(player, percent) {
     const overlay = getVolumeOverlay();
     const rect = player.getBoundingClientRect();
-    const left = clamp(rect.left + rect.width / 2, 58, innerWidth - 58);
-    const top = clamp(rect.top + 14, 12, innerHeight - 48);
+    const left = clamp(rect.left + rect.width / 2, 96, innerWidth - 96);
+    const top = clamp(rect.top + rect.height / 3, 40, innerHeight - 40);
 
     overlay.style.left = `${Math.round(left)}px`;
     overlay.style.top = `${Math.round(top)}px`;
-    overlay.style.transform = "translate(-50%, 0)";
+    overlay.style.transform = "translate(-50%, -50%)";
     overlay.textContent = `Volume ${percent}%`;
     overlay.dataset.visible = "1";
 
