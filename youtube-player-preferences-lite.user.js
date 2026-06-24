@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Player Preferences Lite
 // @namespace    Citizen.youtube.player-preferences-lite
-// @version      3
+// @version      4
 // @description  Applies small YouTube player preferences without touching Enhancer-style miniplayer, queue, autoplay, or background playback controls.
 // @author       Citizen
 // @match        https://www.youtube.com/*
@@ -121,18 +121,27 @@
       .${VOLUME_OVERLAY_CLASS} {
         position: fixed !important;
         z-index: 2147483647 !important;
-        min-width: 112px !important;
-        padding: 8px 14px !important;
-        border: 1px solid rgba(255, 255, 255, 0.16) !important;
+        min-width: 0 !important;
+        padding: 0 6px !important;
+        border: 0 !important;
         border-radius: 4px !important;
         box-sizing: border-box !important;
-        background: rgba(0, 0, 0, 0.86) !important;
-        box-shadow: 0 6px 22px rgba(0, 0, 0, 0.45) !important;
+        background: transparent !important;
+        box-shadow: none !important;
         color: #fff !important;
-        font: 700 18px/1.2 Arial, Helvetica, sans-serif !important;
+        font: 800 22px/1.2 Arial, Helvetica, sans-serif !important;
         letter-spacing: 0 !important;
         text-align: center !important;
-        text-shadow: 0 1px 1px rgba(0, 0, 0, 0.75) !important;
+        text-shadow:
+          -2px -2px 0 rgba(0, 0, 0, 0.92),
+           0   -2px 0 rgba(0, 0, 0, 0.92),
+           2px -2px 0 rgba(0, 0, 0, 0.92),
+          -2px  0   0 rgba(0, 0, 0, 0.92),
+           2px  0   0 rgba(0, 0, 0, 0.92),
+          -2px  2px 0 rgba(0, 0, 0, 0.92),
+           0    2px 0 rgba(0, 0, 0, 0.92),
+           2px  2px 0 rgba(0, 0, 0, 0.92),
+           0    4px 10px rgba(0, 0, 0, 0.7) !important;
         white-space: nowrap !important;
         opacity: 0 !important;
         pointer-events: none !important;
