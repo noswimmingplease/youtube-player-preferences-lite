@@ -197,6 +197,15 @@
           flex: 1 1 auto !important;
         }
 
+        ytd-watch-flexy #panels-full-bleed-container:empty,
+        ytd-watch-flexy #panels-full-bleed-container:not(:has(*)) {
+          display: none !important;
+          flex: 0 0 0 !important;
+          max-width: 0 !important;
+          min-width: 0 !important;
+          width: 0 !important;
+        }
+
         ytd-watch-flexy #panels:has(ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-live-chat"]),
         ytd-watch-flexy ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-live-chat"],
         ytd-watch-flexy ytd-engagement-panel-section-list-renderer:has(ytd-live-chat-frame),
