@@ -11,6 +11,7 @@ Tampermonkey userscript that applies a small set of YouTube player preferences w
 - Hides info cards, paid-content overlays, and end-screen overlays.
 - Automatically enables YouTube theatre mode on watch/live pages.
 - Adds mouse-wheel volume control over the player, only while holding the right mouse button.
+- Shows a temporary top-centre volume percentage overlay when script-controlled volume changes.
 
 ## Deliberately Not Included
 

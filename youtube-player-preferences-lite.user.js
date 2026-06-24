@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Player Preferences Lite
 // @namespace    Citizen.youtube.player-preferences-lite
-// @version      1
+// @version      2
 // @description  Applies small YouTube player preferences without touching Enhancer-style miniplayer, queue, autoplay, or background playback controls.
 // @author       Citizen
 // @match        https://www.youtube.com/*
@@ -26,6 +26,7 @@
   };
 
   const STYLE_ID = "ytppl-style";
+  const VOLUME_OVERLAY_CLASS = "ytppl-volume-overlay";
   const SHORTS_LINK_SELECTOR = 'a[href^="/shorts/"], a[href*="youtube.com/shorts/"]';
   const WATCH_PATHS = ["/watch", "/live/"];
   const EXCLUDED_SURFACE_SELECTOR = [
@@ -41,6 +42,7 @@
   let scheduled = false;
   let rightButtonHeldOnPlayer = false;
   let suppressNextContextMenu = false;
+  let volumeOverlayHideTimer = 0;
 
   function isWatchPath() {
     return location.pathname === WATCH_PATHS[0] || location.pathname.startsWith(WATCH_PATHS[1]);
@@ -115,7 +117,33 @@
   }
 
   function buildCss() {
-    const rules = [];
+    const rules = [`
+      .html5-video-player .${VOLUME_OVERLAY_CLASS},
+      #movie_player .${VOLUME_OVERLAY_CLASS} {
+        position: absolute !important;
+        top: 14px !important;
+        left: 50% !important;
+        transform: translateX(-50%) !important;
+        z-index: 70 !important;
+        min-width: 72px !important;
+        padding: 7px 12px !important;
+        border-radius: 4px !important;
+        box-sizing: border-box !important;
+        background: rgba(0, 0, 0, 0.78) !important;
+        color: #fff !important;
+        font: 600 18px/1.2 Arial, Helvetica, sans-serif !important;
+        text-align: center !important;
+        text-shadow: 0 1px 1px rgba(0, 0, 0, 0.75) !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+        transition: opacity 120ms ease-out !important;
+      }
+
+      .html5-video-player .${VOLUME_OVERLAY_CLASS}[data-visible="1"],
+      #movie_player .${VOLUME_OVERLAY_CLASS}[data-visible="1"] {
+        opacity: 1 !important;
+      }
+    `];
 
     if (CONFIG.hideShorts) {
       rules.push(`
@@ -233,9 +261,31 @@
     return Math.min(max, Math.max(min, value));
   }
 
+  function getVolumeOverlay(player) {
+    let overlay = player.querySelector(`.${VOLUME_OVERLAY_CLASS}`);
+    if (overlay) return overlay;
+
+    overlay = document.createElement("div");
+    overlay.className = VOLUME_OVERLAY_CLASS;
+    overlay.setAttribute("aria-hidden", "true");
+    player.appendChild(overlay);
+    return overlay;
+  }
+
+  function showVolumeOverlay(player, percent) {
+    const overlay = getVolumeOverlay(player);
+    overlay.textContent = `${percent}%`;
+    overlay.dataset.visible = "1";
+
+    clearTimeout(volumeOverlayHideTimer);
+    volumeOverlayHideTimer = setTimeout(() => {
+      overlay.dataset.visible = "0";
+    }, 850);
+  }
+
   function setPlayerVolume(player, nextVolume) {
     const video = getPlayerVideo(player);
-    if (!video) return false;
+    if (!video) return null;
 
     const nextPercent = Math.round(clamp(nextVolume, 0, 1) * 100);
 
@@ -252,7 +302,7 @@
       video.muted = false;
     }
 
-    return true;
+    return nextPercent;
   }
 
   function handleWheelVolume(event) {
@@ -271,7 +321,10 @@
     const step = clamp(CONFIG.wheelVolumeStep, 1, 100) / 100;
     const nextVolume = clamp(video.volume + direction * step, 0, 1);
 
-    if (!setPlayerVolume(player, nextVolume)) return;
+    const nextPercent = setPlayerVolume(player, nextVolume);
+    if (nextPercent === null) return;
+
+    showVolumeOverlay(player, nextPercent);
 
     event.preventDefault();
     event.stopImmediatePropagation();
