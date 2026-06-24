@@ -27,20 +27,7 @@
 
   const STYLE_ID = "ytppl-style";
   const VOLUME_OVERLAY_CLASS = "ytppl-volume-overlay";
-  const HIDDEN_CHAT_FLAG = "data-ytppl-chat-hidden";
   const SHORTS_LINK_SELECTOR = 'a[href^="/shorts/"], a[href*="youtube.com/shorts/"]';
-  const CHAT_PANEL_SELECTOR = [
-    'ytd-engagement-panel-section-list-renderer[target-id*="chat"]',
-    'ytd-engagement-panel-section-list-renderer:has(ytd-live-chat-frame)',
-    'ytd-engagement-panel-section-list-renderer:has(yt-live-chat-app)',
-    'ytd-engagement-panel-section-list-renderer:has(ytd-watch-live-chat-renderer)',
-    'ytd-engagement-panel-section-list-renderer:has(ytd-watch-live-chat-replay-renderer)',
-  ].join(',');
-  const CHAT_REPLAY_TEXT_CONTAINER_SELECTOR = [
-    'ytd-watch-flexy #panels',
-    'ytd-watch-flexy ytd-engagement-panel-section-list-renderer',
-  ].join(',');
-  const CHAT_REPLAY_TEXT_PATTERN = /\blive chat replay\b|see what others said about this video while it was live/i;
   const WATCH_PATHS = ["/watch", "/live/"];
   const EXCLUDED_SURFACE_SELECTOR = [
     "ytd-miniplayer",
@@ -74,32 +61,6 @@
 
     const el = target.nodeType === Node.ELEMENT_NODE ? target : target.parentElement;
     return el ? el.closest(selector) : null;
-  }
-
-  function queryAllIncludingRoot(root, selector) {
-    const elements = [];
-
-    if (root.nodeType === Node.ELEMENT_NODE && root.matches(selector)) {
-      elements.push(root);
-    }
-
-    if (root.querySelectorAll) {
-      root.querySelectorAll(selector).forEach((el) => elements.push(el));
-    }
-
-    return elements;
-  }
-
-  function getText(el) {
-    return el ? el.textContent.replace(/\s+/g, " ").trim() : "";
-  }
-
-  function hideElement(el) {
-    if (!el || el.hasAttribute(HIDDEN_CHAT_FLAG)) return;
-
-    el.style.setProperty("display", "none", "important");
-    el.setAttribute("hidden", "");
-    el.setAttribute(HIDDEN_CHAT_FLAG, "1");
   }
 
   function getShortsIdFromUrl(rawUrl) {
@@ -218,17 +179,26 @@
       rules.push(`
         ytd-watch-flexy #below,
         ytd-watch-flexy ytd-watch-metadata,
-        ytd-watch-flexy #description,
+        ytd-watch-flexy ytd-watch-metadata #description.ytd-watch-metadata,
+        ytd-watch-flexy ytd-watch-metadata #description-inner.ytd-watch-metadata,
+        ytd-watch-flexy ytd-watch-metadata #description-inline-expander.ytd-watch-metadata,
+        ytd-watch-flexy ytd-watch-metadata ytd-text-inline-expander,
+        ytd-watch-flexy ytd-watch-metadata ytd-watch-info-text,
         ytd-watch-flexy #bottom-row,
         ytd-watch-flexy #top-row {
           max-width: 100% !important;
+          min-width: 0 !important;
           width: 100% !important;
         }
 
+        ytd-watch-flexy ytd-watch-metadata #description.ytd-watch-metadata,
+        ytd-watch-flexy ytd-watch-metadata #description-inner.ytd-watch-metadata,
+        ytd-watch-flexy ytd-watch-metadata #description-inline-expander.ytd-watch-metadata {
+          flex: 1 1 auto !important;
+        }
+
         ytd-watch-flexy #panels:has(ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-live-chat"]),
-        ytd-watch-flexy #panels:has(ytd-engagement-panel-section-list-renderer[target-id*="chat"]),
         ytd-watch-flexy ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-live-chat"],
-        ytd-watch-flexy ytd-engagement-panel-section-list-renderer[target-id*="chat"],
         ytd-watch-flexy ytd-engagement-panel-section-list-renderer:has(ytd-live-chat-frame),
         ytd-watch-flexy ytd-engagement-panel-section-list-renderer:has(yt-live-chat-app),
         ytd-watch-flexy ytd-engagement-panel-section-list-renderer:has(ytd-watch-live-chat-renderer),
@@ -238,7 +208,17 @@
         ytd-watch-flexy ytd-live-chat-frame,
         ytd-watch-live-chat-renderer,
         ytd-watch-live-chat-replay-renderer,
-        ytd-live-chat-viewer-engagement-message-renderer {
+        ytd-live-chat-viewer-engagement-message-renderer,
+        ytd-watch-flexy ytd-watch-metadata #teaser-carousel.ytd-watch-metadata:has(yt-carousel-item-view-model[aria-label="Live chat replay"]),
+        ytd-watch-flexy ytd-watch-metadata #teaser-carousel.ytd-watch-metadata:has(yt-carousel-item-view-model[aria-label*="Live chat" i]),
+        ytd-watch-flexy yt-video-metadata-carousel-view-model:has(yt-carousel-item-view-model[aria-label="Live chat replay"]),
+        ytd-watch-flexy yt-video-metadata-carousel-view-model:has(yt-carousel-item-view-model[aria-label*="Live chat" i]),
+        ytd-watch-flexy .ytVideoMetadataCarouselViewModelHost:has(yt-carousel-item-view-model[aria-label="Live chat replay"]),
+        ytd-watch-flexy .ytVideoMetadataCarouselViewModelHost:has(yt-carousel-item-view-model[aria-label*="Live chat" i]),
+        ytd-watch-flexy .ytVideoMetadataCarouselViewModelCarouselContainer:has(yt-carousel-item-view-model[aria-label="Live chat replay"]),
+        ytd-watch-flexy .ytVideoMetadataCarouselViewModelCarouselContainer:has(yt-carousel-item-view-model[aria-label*="Live chat" i]),
+        ytd-watch-flexy .ytVideoMetadataCarouselViewModelTitleSection:has(+ .ytVideoMetadataCarouselViewModelCarouselContainer yt-carousel-item-view-model[aria-label="Live chat replay"]),
+        ytd-watch-flexy .ytVideoMetadataCarouselViewModelTitleSection:has(+ .ytVideoMetadataCarouselViewModelCarouselContainer yt-carousel-item-view-model[aria-label*="Live chat" i]) {
           display: none !important;
         }
       `);
@@ -268,19 +248,6 @@
     }
 
     return rules.join("\n");
-  }
-
-  function hideChatPanels(root = document) {
-    if (!CONFIG.hideChat || !isWatchPath()) return;
-
-    queryAllIncludingRoot(root, CHAT_PANEL_SELECTOR).forEach(hideElement);
-
-    queryAllIncludingRoot(root, CHAT_REPLAY_TEXT_CONTAINER_SELECTOR).forEach((el) => {
-      if (!CHAT_REPLAY_TEXT_PATTERN.test(getText(el))) return;
-
-      const panel = el.closest("ytd-engagement-panel-section-list-renderer") || el.closest("#panels");
-      hideElement(panel || el);
-    });
   }
 
   function ensureStyles() {
@@ -447,7 +414,6 @@
     ensureStyles();
     convertCurrentShortsPage();
     rewriteShortsLinks(root);
-    hideChatPanels(root);
 
     if (isWatchPath()) {
       setTimeout(enableTheaterMode, 300);
