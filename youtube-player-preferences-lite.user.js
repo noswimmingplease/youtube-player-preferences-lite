@@ -128,9 +128,9 @@
         box-sizing: border-box !important;
         background: transparent !important;
         box-shadow: none !important;
-        color: #fff !important;
-        font: 800 34px/1.1 "Segoe UI Variable Display", "Segoe UI", Roboto, Arial, Helvetica, sans-serif !important;
-        -webkit-text-fill-color: #fff !important;
+        color: #ffff00 !important;
+        font: 800 42px/1.1 "Segoe UI Variable Display", "Segoe UI", Roboto, Arial, Helvetica, sans-serif !important;
+        -webkit-text-fill-color: #ffff00 !important;
         -webkit-text-stroke: 2.4px rgba(0, 0, 0, 0.88) !important;
         letter-spacing: 0 !important;
         text-align: center !important;
@@ -290,7 +290,7 @@
     overlay.style.left = `${Math.round(left)}px`;
     overlay.style.top = `${Math.round(top)}px`;
     overlay.style.transform = "translate(-50%, -50%)";
-    overlay.textContent = `Volume ${percent}%`;
+    overlay.textContent = String(percent);
     overlay.dataset.visible = "1";
 
     clearTimeout(volumeOverlayHideTimer);
