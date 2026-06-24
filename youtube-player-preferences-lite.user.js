@@ -177,6 +177,19 @@
 
     if (CONFIG.hideChat) {
       rules.push(`
+        ytd-watch-flexy #below,
+        ytd-watch-flexy ytd-watch-metadata,
+        ytd-watch-flexy #description,
+        ytd-watch-flexy #bottom-row,
+        ytd-watch-flexy #top-row {
+          max-width: 100% !important;
+          width: 100% !important;
+        }
+
+        ytd-watch-flexy #panels:has(ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-live-chat"]),
+        ytd-watch-flexy ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-live-chat"],
+        ytd-watch-flexy ytd-engagement-panel-section-list-renderer:has(ytd-live-chat-frame),
+        ytd-watch-flexy ytd-engagement-panel-section-list-renderer:has(yt-live-chat-app),
         ytd-watch-flexy #chat-container,
         ytd-watch-flexy #chat,
         ytd-watch-flexy ytd-live-chat-frame,

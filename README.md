@@ -7,7 +7,7 @@ Tampermonkey userscript that applies a small set of YouTube player preferences w
 - Converts Shorts URLs to normal watch URLs.
 - Hides Shorts shelves, Shorts cards, and Shorts guide entries.
 - Hides the watch-page related recommendations renderer without touching playlist or queue panels.
-- Hides live chat and chat replay panels.
+- Hides live chat, chat replay, and below-video live chat engagement panels.
 - Hides info cards, paid-content overlays, and end-screen overlays.
 - Automatically enables YouTube theatre mode on watch/live pages.
 - Adds mouse-wheel volume control over the player, only while holding the right mouse button.
@@ -51,4 +51,4 @@ https://github.com/Ci303/youtube-player-preferences-lite/releases/latest/downloa
 
 ## Scope
 
-This script avoids `ytd-miniplayer`, playlist panels, queue panels, and engagement panels. If YouTube changes its markup, selector updates may be needed.
+This script avoids `ytd-miniplayer`, playlist panels, and queue panels. If YouTube changes its markup, selector updates may be needed.
