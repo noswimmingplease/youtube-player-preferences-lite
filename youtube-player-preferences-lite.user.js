@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Player Preferences Lite
 // @namespace    Citizen.youtube.player-preferences-lite
-// @version      2
+// @version      3
 // @description  Applies small YouTube player preferences without touching Enhancer-style miniplayer, queue, autoplay, or background playback controls.
 // @author       Citizen
 // @match        https://www.youtube.com/*
@@ -118,29 +118,28 @@
 
   function buildCss() {
     const rules = [`
-      .html5-video-player .${VOLUME_OVERLAY_CLASS},
-      #movie_player .${VOLUME_OVERLAY_CLASS} {
-        position: absolute !important;
-        top: 14px !important;
-        left: 50% !important;
-        transform: translateX(-50%) !important;
-        z-index: 70 !important;
-        min-width: 72px !important;
-        padding: 7px 12px !important;
+      .${VOLUME_OVERLAY_CLASS} {
+        position: fixed !important;
+        z-index: 2147483647 !important;
+        min-width: 112px !important;
+        padding: 8px 14px !important;
+        border: 1px solid rgba(255, 255, 255, 0.16) !important;
         border-radius: 4px !important;
         box-sizing: border-box !important;
-        background: rgba(0, 0, 0, 0.78) !important;
+        background: rgba(0, 0, 0, 0.86) !important;
+        box-shadow: 0 6px 22px rgba(0, 0, 0, 0.45) !important;
         color: #fff !important;
-        font: 600 18px/1.2 Arial, Helvetica, sans-serif !important;
+        font: 700 18px/1.2 Arial, Helvetica, sans-serif !important;
+        letter-spacing: 0 !important;
         text-align: center !important;
         text-shadow: 0 1px 1px rgba(0, 0, 0, 0.75) !important;
+        white-space: nowrap !important;
         opacity: 0 !important;
         pointer-events: none !important;
-        transition: opacity 120ms ease-out !important;
+        transition: opacity 120ms ease-out, transform 120ms ease-out !important;
       }
 
-      .html5-video-player .${VOLUME_OVERLAY_CLASS}[data-visible="1"],
-      #movie_player .${VOLUME_OVERLAY_CLASS}[data-visible="1"] {
+      .${VOLUME_OVERLAY_CLASS}[data-visible="1"] {
         opacity: 1 !important;
       }
     `];
@@ -261,20 +260,33 @@
     return Math.min(max, Math.max(min, value));
   }
 
-  function getVolumeOverlay(player) {
-    let overlay = player.querySelector(`.${VOLUME_OVERLAY_CLASS}`);
-    if (overlay) return overlay;
+  function getVolumeOverlay() {
+    const parent = document.fullscreenElement || document.body || document.documentElement;
+    let overlay = document.querySelector(`.${VOLUME_OVERLAY_CLASS}`);
 
-    overlay = document.createElement("div");
-    overlay.className = VOLUME_OVERLAY_CLASS;
-    overlay.setAttribute("aria-hidden", "true");
-    player.appendChild(overlay);
+    if (!overlay) {
+      overlay = document.createElement("div");
+      overlay.className = VOLUME_OVERLAY_CLASS;
+      overlay.setAttribute("aria-hidden", "true");
+    }
+
+    if (overlay.parentElement !== parent) {
+      parent.appendChild(overlay);
+    }
+
     return overlay;
   }
 
   function showVolumeOverlay(player, percent) {
-    const overlay = getVolumeOverlay(player);
-    overlay.textContent = `${percent}%`;
+    const overlay = getVolumeOverlay();
+    const rect = player.getBoundingClientRect();
+    const left = clamp(rect.left + rect.width / 2, 58, innerWidth - 58);
+    const top = clamp(rect.top + 14, 12, innerHeight - 48);
+
+    overlay.style.left = `${Math.round(left)}px`;
+    overlay.style.top = `${Math.round(top)}px`;
+    overlay.style.transform = "translate(-50%, 0)";
+    overlay.textContent = `Volume ${percent}%`;
     overlay.dataset.visible = "1";
 
     clearTimeout(volumeOverlayHideTimer);
