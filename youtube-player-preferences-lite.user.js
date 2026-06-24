@@ -130,18 +130,13 @@
         box-shadow: none !important;
         color: #fff !important;
         font: 800 34px/1.1 "Segoe UI Variable Display", "Segoe UI", Roboto, Arial, Helvetica, sans-serif !important;
+        -webkit-text-fill-color: #fff !important;
+        -webkit-text-stroke: 2.4px rgba(0, 0, 0, 0.88) !important;
         letter-spacing: 0 !important;
         text-align: center !important;
         text-shadow:
-          -3px -3px 0 rgba(0, 0, 0, 0.9),
-           0   -3px 0 rgba(0, 0, 0, 0.9),
-           3px -3px 0 rgba(0, 0, 0, 0.9),
-          -3px  0   0 rgba(0, 0, 0, 0.9),
-           3px  0   0 rgba(0, 0, 0, 0.9),
-          -3px  3px 0 rgba(0, 0, 0, 0.9),
-           0    3px 0 rgba(0, 0, 0, 0.9),
-           3px  3px 0 rgba(0, 0, 0, 0.9),
-           0    5px 16px rgba(0, 0, 0, 0.75) !important;
+          0 0 2px rgba(0, 0, 0, 0.95),
+          0 3px 10px rgba(0, 0, 0, 0.78) !important;
         white-space: nowrap !important;
         opacity: 0 !important;
         pointer-events: none !important;
