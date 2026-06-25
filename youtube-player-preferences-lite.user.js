@@ -244,10 +244,6 @@
         .html5-video-player .ytp-endscreen-previous,
         .html5-video-player .ytp-endscreen-next,
         .html5-video-player .ytp-endscreen-paginate,
-        .html5-video-player .ytp-videowall-still,
-        .html5-video-player .ytp-suggestion-set,
-        .html5-video-player .ytp-autonav-endscreen-upnext-container,
-        .html5-video-player .ytp-upnext,
         .html5-video-player .ytp-paid-content-overlay {
           display: none !important;
           opacity: 0 !important;
