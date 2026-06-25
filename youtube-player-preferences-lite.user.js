@@ -94,6 +94,8 @@
     if (!CONFIG.convertShortsToWatch) return;
 
     root.querySelectorAll(SHORTS_LINK_SELECTOR).forEach((link) => {
+      if (isExcludedSurface(link)) return;
+
       const shortId = getShortsIdFromUrl(link.href || link.getAttribute("href"));
       if (!shortId) return;
 
