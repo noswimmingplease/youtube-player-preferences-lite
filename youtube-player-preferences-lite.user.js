@@ -60,6 +60,7 @@
   ].join(",");
 
   let scheduled = false;
+  let theaterModeUserDisabled = false;
   let rightButtonHeldOnPlayer = false;
   let suppressNextContextMenu = false;
   let volumeOverlayHideTimer = 0;
@@ -360,7 +361,7 @@
   }
 
   function enableTheaterMode() {
-    if (!CONFIG.enableTheaterMode || !isWatchPath() || isTheaterModeEnabled()) return;
+    if (!CONFIG.enableTheaterMode || theaterModeUserDisabled || !isWatchPath() || isTheaterModeEnabled()) return;
     if (document.fullscreenElement) return;
 
     const player = document.querySelector("#movie_player, .html5-video-player");
@@ -368,6 +369,13 @@
     if (!sizeButton || sizeButton.disabled || sizeButton.getAttribute("aria-disabled") === "true") return;
 
     sizeButton.click();
+  }
+
+  function handleTheaterModeToggle(event) {
+    if (!CONFIG.enableTheaterMode || !isWatchPath()) return;
+    if (!closestElement(event.target, ".ytp-size-button")) return;
+
+    theaterModeUserDisabled = isTheaterModeEnabled();
   }
 
   function getPlayerFromTarget(target) {
@@ -500,6 +508,11 @@
     }
   }
 
+  function handleNavigateFinish() {
+    theaterModeUserDisabled = false;
+    applyPreferences(document);
+  }
+
   function scheduleApply(root = document) {
     if (scheduled) return;
 
@@ -524,11 +537,12 @@
   observer.observe(document.documentElement, { childList: true, subtree: true });
 
   document.addEventListener("click", handleShortsClick, true);
+  document.addEventListener("click", handleTheaterModeToggle, true);
   document.addEventListener("wheel", handleWheelVolume, { capture: true, passive: false });
   document.addEventListener("mousedown", handleMouseDown, true);
   document.addEventListener("mouseup", handleMouseUp, true);
   document.addEventListener("contextmenu", handleContextMenu, true);
 
-  window.addEventListener("yt-navigate-finish", () => applyPreferences(document), true);
+  window.addEventListener("yt-navigate-finish", handleNavigateFinish, true);
   window.addEventListener("yt-page-data-updated", () => applyPreferences(document), true);
 })();
