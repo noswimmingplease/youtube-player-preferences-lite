@@ -16,6 +16,7 @@
   const CONFIG = {
     convertShortsToWatch: true,
     hideShorts: true,
+    hideUpcomingStreams: true,
     hideRelatedVideos: true,
     hideChat: true,
     hideInfoCardsAndEndScreens: true,
@@ -28,6 +29,25 @@
   const STYLE_ID = "ytppl-style";
   const VOLUME_OVERLAY_CLASS = "ytppl-volume-overlay";
   const SHORTS_LINK_SELECTOR = 'a[href^="/shorts/"], a[href*="youtube.com/shorts/"]';
+  const UPCOMING_STREAM_CONTAINER_SELECTOR = [
+    "ytd-rich-item-renderer",
+    "ytd-video-renderer",
+    "ytd-grid-video-renderer",
+    "ytd-compact-video-renderer",
+  ].join(",");
+  const UPCOMING_STREAM_SCAN_SELECTOR = [
+    UPCOMING_STREAM_CONTAINER_SELECTOR,
+    "yt-lockup-view-model",
+    "yt-lockup-view-model-wiz",
+  ].join(",");
+  const UPCOMING_STREAM_BADGE_SELECTOR = [
+    ".yt-badge-shape__text",
+    "badge-shape",
+    "yt-badge-shape",
+    "ytd-thumbnail-overlay-time-status-renderer",
+    "yt-thumbnail-overlay-badge-view-model",
+    "yt-thumbnail-bottom-overlay-view-model",
+  ].join(",");
   const WATCH_PATHS = ["/watch", "/live/"];
   const EXCLUDED_SURFACE_SELECTOR = [
     "ytd-miniplayer",
@@ -81,6 +101,10 @@
     return url.toString();
   }
 
+  function getElementText(el) {
+    return el ? el.textContent.replace(/\s+/g, " ").trim() : "";
+  }
+
   function convertCurrentShortsPage() {
     if (!CONFIG.convertShortsToWatch || !isShortsPath()) return;
 
@@ -116,6 +140,53 @@
     event.preventDefault();
     event.stopPropagation();
     location.assign(getWatchUrlForShort(shortId));
+  }
+
+  function hasUpcomingStreamBadge(card) {
+    return Array.from(card.querySelectorAll(UPCOMING_STREAM_BADGE_SELECTOR)).some((el) => {
+      const text = getElementText(el);
+      const label = el.getAttribute("aria-label") || "";
+      return /^Upcoming$/i.test(text) || /^Upcoming$/i.test(label);
+    });
+  }
+
+  function isUpcomingStreamCard(card) {
+    if (!card || isExcludedSurface(card)) return false;
+
+    const text = getElementText(card);
+    return (
+      hasUpcomingStreamBadge(card) ||
+      /\bScheduled for\b/i.test(text) ||
+      (/\bNotify me\b/i.test(text) && /\b(waiting|Scheduled)\b/i.test(text))
+    );
+  }
+
+  function setUpcomingStreamHidden(card, hidden) {
+    const container = closestElement(card, UPCOMING_STREAM_CONTAINER_SELECTOR) || card;
+
+    if (hidden) {
+      container.dataset.ytpplUpcomingHidden = "1";
+      container.hidden = true;
+      container.style.setProperty("display", "none", "important");
+      return;
+    }
+
+    if (container.dataset.ytpplUpcomingHidden !== "1") return;
+
+    delete container.dataset.ytpplUpcomingHidden;
+    container.hidden = false;
+    container.style.removeProperty("display");
+  }
+
+  function hideUpcomingStreams(root = document) {
+    if (!CONFIG.hideUpcomingStreams || !root || !root.querySelectorAll) return;
+
+    const cards = new Set();
+    if (root.nodeType === Node.ELEMENT_NODE && root.matches(UPCOMING_STREAM_SCAN_SELECTOR)) {
+      cards.add(root);
+    }
+    root.querySelectorAll(UPCOMING_STREAM_SCAN_SELECTOR).forEach((card) => cards.add(card));
+    cards.forEach((card) => setUpcomingStreamHidden(card, isUpcomingStreamCard(card)));
   }
 
   function buildCss() {
@@ -421,6 +492,7 @@
     ensureStyles();
     convertCurrentShortsPage();
     rewriteShortsLinks(root);
+    hideUpcomingStreams(root);
 
     if (isWatchPath()) {
       setTimeout(enableTheaterMode, 300);
