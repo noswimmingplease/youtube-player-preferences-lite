@@ -203,14 +203,13 @@
         background: transparent !important;
         box-shadow: none !important;
         color: #ffff00 !important;
-        font: 800 42px/1.1 "Segoe UI Variable Display", "Segoe UI", Roboto, Arial, Helvetica, sans-serif !important;
-        -webkit-text-fill-color: #ffff00 !important;
-        -webkit-text-stroke: 3.4px rgba(0, 0, 0, 0.9) !important;
+        font: 700 42px/1.1 Roboto, Arial, sans-serif !important;
         letter-spacing: 0 !important;
         text-align: center !important;
         text-shadow:
-          0 0 2px rgba(0, 0, 0, 0.95),
-          0 3px 10px rgba(0, 0, 0, 0.78) !important;
+          0 1px 2px rgba(0, 0, 0, 0.92),
+          0 3px 7px rgba(0, 0, 0, 0.78),
+          0 8px 18px rgba(0, 0, 0, 0.58) !important;
         white-space: nowrap !important;
         opacity: 0 !important;
         pointer-events: none !important;
