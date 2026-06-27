@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Player Preferences Lite
 // @namespace    Citizen.youtube.player-preferences-lite
-// @version      1
+// @version      2
 // @description  Applies small YouTube player preferences without touching Enhancer-style miniplayer, queue, autoplay, or background playback controls.
 // @author       Citizen
 // @match        https://www.youtube.com/*
@@ -17,6 +17,7 @@
     convertShortsToWatch: true,
     hideShorts: true,
     hideUpcomingStreams: true,
+    hidePayToWatchCards: true,
     hideRelatedVideos: true,
     hideChat: true,
     hideInfoCardsAndEndScreens: true,
@@ -29,14 +30,14 @@
   const STYLE_ID = "ytppl-style";
   const VOLUME_OVERLAY_CLASS = "ytppl-volume-overlay";
   const SHORTS_LINK_SELECTOR = 'a[href^="/shorts/"], a[href*="youtube.com/shorts/"]';
-  const UPCOMING_STREAM_CONTAINER_SELECTOR = [
+  const FEED_CARD_CONTAINER_SELECTOR = [
     "ytd-rich-item-renderer",
     "ytd-video-renderer",
     "ytd-grid-video-renderer",
     "ytd-compact-video-renderer",
   ].join(",");
   const UPCOMING_STREAM_SCAN_SELECTOR = [
-    UPCOMING_STREAM_CONTAINER_SELECTOR,
+    FEED_CARD_CONTAINER_SELECTOR,
     "yt-lockup-view-model",
     "yt-lockup-view-model-wiz",
   ].join(",");
@@ -48,6 +49,21 @@
     "yt-thumbnail-overlay-badge-view-model",
     "yt-thumbnail-bottom-overlay-view-model",
   ].join(",");
+  const PAY_TO_WATCH_SCAN_SELECTOR = [
+    UPCOMING_STREAM_SCAN_SELECTOR,
+    "yt-lockup-metadata-view-model",
+    "yt-lockup-metadata-view-model-wiz",
+  ].join(",");
+  const PAY_TO_WATCH_TEXT_SELECTOR = [
+    "yt-lockup-metadata-view-model",
+    "yt-lockup-metadata-view-model-wiz",
+    "ytd-video-meta-block",
+    "#metadata-line",
+    ".yt-badge-shape__text",
+    "badge-shape",
+    "yt-badge-shape",
+    "ytd-badge-supported-renderer",
+  ].join(",");
   const WATCH_PATHS = ["/watch", "/live/"];
   const EXCLUDED_SURFACE_SELECTOR = [
     "ytd-miniplayer",
@@ -58,6 +74,7 @@
     "ytd-playlist-panel-renderer #items",
     "ytd-engagement-panel-section-list-renderer",
   ].join(",");
+  const CARD_HIDE_DATASET_KEYS = ["ytpplUpcomingHidden", "ytpplPayToWatchHidden"];
 
   let scheduled = false;
   let theaterModeUserDisabled = false;
@@ -162,21 +179,29 @@
     );
   }
 
-  function setUpcomingStreamHidden(card, hidden) {
-    const container = closestElement(card, UPCOMING_STREAM_CONTAINER_SELECTOR) || card;
+  function setCardHidden(card, datasetKey, hidden) {
+    const container = closestElement(card, FEED_CARD_CONTAINER_SELECTOR) || card;
 
     if (hidden) {
-      container.dataset.ytpplUpcomingHidden = "1";
-      container.hidden = true;
-      container.style.setProperty("display", "none", "important");
+      container.dataset[datasetKey] = "1";
+    } else if (container.dataset[datasetKey] === "1") {
+      delete container.dataset[datasetKey];
+    } else {
       return;
     }
 
-    if (container.dataset.ytpplUpcomingHidden !== "1") return;
+    const shouldHide = CARD_HIDE_DATASET_KEYS.some((key) => container.dataset[key] === "1");
+    container.hidden = shouldHide;
 
-    delete container.dataset.ytpplUpcomingHidden;
-    container.hidden = false;
-    container.style.removeProperty("display");
+    if (shouldHide) {
+      container.style.setProperty("display", "none", "important");
+    } else {
+      container.style.removeProperty("display");
+    }
+  }
+
+  function setUpcomingStreamHidden(card, hidden) {
+    setCardHidden(card, "ytpplUpcomingHidden", hidden);
   }
 
   function hideUpcomingStreams(root = document) {
@@ -188,6 +213,40 @@
     }
     root.querySelectorAll(UPCOMING_STREAM_SCAN_SELECTOR).forEach((card) => cards.add(card));
     cards.forEach((card) => setUpcomingStreamHidden(card, isUpcomingStreamCard(card)));
+  }
+
+  function hasPayToWatchText(card) {
+    const candidates = new Set();
+    if (card.matches(PAY_TO_WATCH_TEXT_SELECTOR)) {
+      candidates.add(card);
+    }
+    card.querySelectorAll(PAY_TO_WATCH_TEXT_SELECTOR).forEach((el) => candidates.add(el));
+
+    return Array.from(candidates).some((el) => {
+      const text = getElementText(el);
+      const label = el.getAttribute("aria-label") || "";
+      return /\bPay to watch\b/i.test(text) || /\bPay to watch\b/i.test(label);
+    });
+  }
+
+  function isPayToWatchCard(card) {
+    if (!card || isExcludedSurface(card)) return false;
+    return hasPayToWatchText(card);
+  }
+
+  function setPayToWatchHidden(card, hidden) {
+    setCardHidden(card, "ytpplPayToWatchHidden", hidden);
+  }
+
+  function hidePayToWatchCards(root = document) {
+    if (!CONFIG.hidePayToWatchCards || !root || !root.querySelectorAll) return;
+
+    const cards = new Set();
+    if (root.nodeType === Node.ELEMENT_NODE && root.matches(PAY_TO_WATCH_SCAN_SELECTOR)) {
+      cards.add(root);
+    }
+    root.querySelectorAll(PAY_TO_WATCH_SCAN_SELECTOR).forEach((card) => cards.add(card));
+    cards.forEach((card) => setPayToWatchHidden(card, isPayToWatchCard(card)));
   }
 
   function buildCss() {
@@ -313,6 +372,7 @@
         .html5-video-player .ytp-ce-element,
         .html5-video-player .ytp-ce-covering-overlay,
         .html5-video-player .ytp-ce-expanding-overlay,
+        .html5-video-player .ytp-ce-hide-button-container,
         .html5-video-player .ytp-endscreen-content,
         .html5-video-player .ytp-endscreen-previous,
         .html5-video-player .ytp-endscreen-next,
@@ -500,6 +560,7 @@
     convertCurrentShortsPage();
     rewriteShortsLinks(root);
     hideUpcomingStreams(root);
+    hidePayToWatchCards(root);
 
     if (isWatchPath()) {
       setTimeout(enableTheaterMode, 300);

@@ -6,6 +6,7 @@ Tampermonkey userscript that applies a small set of YouTube player preferences w
 
 - Converts Shorts URLs to normal watch URLs.
 - Hides Shorts shelves, Shorts cards, and Shorts guide entries.
+- Hides upcoming live-stream and pay-to-watch recommendation cards.
 - Hides the watch-page related recommendations renderer without touching playlist or queue panels.
 - Hides live chat, chat replay, and below-video live chat engagement panels.
 - Hides info cards, paid-content overlays, and end-screen overlays.
