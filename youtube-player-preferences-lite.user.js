@@ -24,6 +24,7 @@
     hideAskButton: true,
     hideThanksButton: true,
     hideShareButton: true,
+    hideInlineSaveButton: true,
     hideJoinButton: true,
     hideMerchShelf: true,
     hideStatementBanners: true,
@@ -163,6 +164,9 @@
     { configKey: "hideAskButton", label: "Ask" },
     { configKey: "hideThanksButton", label: "Thanks" },
     { configKey: "hideShareButton", label: "Share" },
+  ];
+  const WATCH_ACTION_INLINE_BUTTON_RULES = [
+    { configKey: "hideInlineSaveButton", label: "Save" },
   ];
   const WATCH_ACTION_MUTATION_SELECTOR = [
     "ytd-watch-flexy ytd-menu-renderer",
@@ -801,6 +805,13 @@
     );
   }
 
+  function isConfiguredInlineWatchActionMatch(actionElement) {
+    return WATCH_ACTION_INLINE_BUTTON_RULES.some(
+      ({ configKey, label }) =>
+        CONFIG[configKey] && isWatchActionMatch(actionElement, label),
+    );
+  }
+
   function hideWatchActionButtons(root = document) {
     collectMatchingElements(root, WATCH_ACTION_BUTTON_SELECTOR).forEach(
       (buttonModel) => {
@@ -811,7 +822,8 @@
 
         setWatchActionHidden(
           buttonModel,
-          isConfiguredWatchActionMatch(buttonModel),
+          isConfiguredWatchActionMatch(buttonModel) ||
+            isConfiguredInlineWatchActionMatch(buttonModel),
         );
       },
     );

@@ -9,6 +9,7 @@ Tampermonkey userscript that applies a small set of YouTube player preferences w
 - Hides upcoming live-stream and pay-to-watch recommendation cards.
 - Hides the watch-page related recommendations renderer without touching playlist or queue panels.
 - Hides live chat, chat replay, and below-video live chat engagement panels.
+- Hides volatile inline watch action buttons, including Save when YouTube promotes it beside like/dislike.
 - Hides info cards, paid-content overlays, and end-screen overlays.
 - Automatically enables YouTube theatre mode on watch/live pages.
 - Adds mouse-wheel volume control over the player, only while holding the right mouse button.
@@ -20,7 +21,7 @@ Tampermonkey userscript that applies a small set of YouTube player preferences w
 - Queue or playlist panel changes.
 - Autoplay/background-tab playback control.
 - Volume boosting beyond YouTube's normal 0-100% range.
-- Watch-page full-width layout, which belongs in `YouTube Watch: Fill Width (Keep Right Sidebar)`.
+- Watch-page full-width layout, which belongs in `YouTube Watch Layout Cleaner`.
 
 ## Install Tampermonkey
 
