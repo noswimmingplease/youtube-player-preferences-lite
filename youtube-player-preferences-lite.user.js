@@ -1272,6 +1272,16 @@
       `);
     }
 
+    if (CONFIG.collapseDescriptionBlankRows) {
+      rules.push(`
+        ${DESCRIPTION_EXPANDED_SELECTOR} {
+          height: auto !important;
+          max-height: none !important;
+          min-height: 0 !important;
+        }
+      `);
+    }
+
     if (CONFIG.hideHashtags) {
       rules.push(`
         ytd-watch-flexy ytd-watch-metadata a[href^="/hashtag/"],
