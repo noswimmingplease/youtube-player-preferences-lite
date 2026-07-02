@@ -1121,6 +1121,35 @@
     return rect.width > 0 && rect.height > 0;
   }
 
+  function isVisibleDescriptionContentElement(el) {
+    if (!el || closestElement(el, DESCRIPTION_CONTROL_SELECTOR)) {
+      return false;
+    }
+
+    const style = getComputedStyle(el);
+    if (style.display === "none" || style.visibility === "hidden") {
+      return false;
+    }
+
+    return hasRenderedBox(el);
+  }
+
+  function getExpandedDescriptionContentHeight(expanded) {
+    const expandedRect = expanded.getBoundingClientRect();
+    let bottom = 0;
+
+    Array.from(expanded.children).forEach((child) => {
+      if (!isVisibleDescriptionContentElement(child)) {
+        return;
+      }
+
+      const rect = child.getBoundingClientRect();
+      bottom = Math.max(bottom, rect.bottom - expandedRect.top);
+    });
+
+    return bottom ? Math.ceil(bottom) + 1 : 0;
+  }
+
   function getExpandedDescriptionHeightResetElements(expanded) {
     const elements = new Set([expanded]);
 
@@ -1151,6 +1180,11 @@
       el.style.setProperty("min-height", "0", "important");
     });
     expanded.style.setProperty("max-height", "none", "important");
+
+    const contentHeight = getExpandedDescriptionContentHeight(expanded);
+    if (contentHeight) {
+      expanded.style.setProperty("height", `${contentHeight}px`, "important");
+    }
   }
 
   function collapseEmptyExpandedDescriptions(root = document) {
