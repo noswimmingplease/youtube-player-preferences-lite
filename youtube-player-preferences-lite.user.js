@@ -193,6 +193,17 @@
   ].join(",");
   const HASHTAG_LINK_SELECTOR =
     'a[href^="/hashtag/"], a[href*="youtube.com/hashtag/"]';
+  const HASHTAG_TEXT_PATTERN = /(^|\s)#[^\s#]+/g;
+  const HASHTAG_TEXT_TEST_PATTERN = /#[^\s#]+/;
+  const HASHTAG_ONLY_LINE_PATTERN = /^\s*(?:#[^\s#]+\s*)+$/;
+  const HASHTAG_TEXT_ROOT_SELECTOR = [
+    "ytd-watch-flexy ytd-watch-metadata #description",
+    "ytd-watch-flexy ytd-watch-metadata #description-inner",
+    "ytd-watch-flexy ytd-watch-metadata #description-inline-expander",
+    "ytd-watch-flexy ytd-watch-metadata ytd-text-inline-expander",
+    "ytd-watch-flexy ytd-watch-metadata ytd-watch-info-text",
+    "ytd-watch-flexy ytd-video-primary-info-renderer",
+  ].join(",");
   const HASHTAG_EMPTY_ANCESTOR_STOP_SELECTOR = [
     "ytd-watch-metadata",
     "ytd-video-primary-info-renderer",
@@ -201,6 +212,14 @@
     "#description-inline-expander",
     "ytd-text-inline-expander",
   ].join(",");
+  const DESCRIPTION_EXPANDED_SELECTOR = [
+    "ytd-watch-flexy ytd-watch-metadata ytd-text-inline-expander #expanded",
+    "ytd-watch-flexy ytd-watch-metadata #description-inline-expander #expanded",
+  ].join(",");
+  const DESCRIPTION_EXPANDED_COLLAPSED_DATASET_KEY =
+    "ytpplExpandedDescriptionCollapsed";
+  const DESCRIPTION_EXPANDED_COLLAPSED_ATTRIBUTE =
+    "data-ytppl-expanded-description-collapsed";
   const QUALITY_LEVELS_HIGH_TO_LOW = [
     "highres",
     "hd4320",
@@ -869,6 +888,120 @@
     removeEmptyHashtagWrappers(parent);
   }
 
+  function cleanHashtagText(text) {
+    return String(text || "")
+      .split(/\r?\n/)
+      .filter((line) => !HASHTAG_ONLY_LINE_PATTERN.test(line))
+      .map((line) =>
+        line
+          .replace(HASHTAG_TEXT_PATTERN, "$1")
+          .replace(/[ \t]{2,}/g, " ")
+          .trimEnd(),
+      )
+      .join("\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .trimEnd();
+  }
+
+  function removeHashtagTextNode(node) {
+    if (!node || !HASHTAG_TEXT_TEST_PATTERN.test(node.textContent || "")) {
+      return;
+    }
+
+    const cleanedText = cleanHashtagText(node.textContent);
+    if (cleanedText) {
+      node.textContent = cleanedText;
+      return;
+    }
+
+    const parent = node.parentElement;
+    removeAdjacentBlankNodes(node);
+    node.remove();
+    removeEmptyHashtagWrappers(parent);
+  }
+
+  function removeHashtagText(root = document) {
+    collectMatchingElements(root, HASHTAG_TEXT_ROOT_SELECTOR).forEach(
+      (container) => {
+        const textNodes = [];
+        const walker = document.createTreeWalker(
+          container,
+          NodeFilter.SHOW_TEXT,
+          {
+            acceptNode(node) {
+              return HASHTAG_TEXT_TEST_PATTERN.test(node.textContent || "")
+                ? NodeFilter.FILTER_ACCEPT
+                : NodeFilter.FILTER_REJECT;
+            },
+          },
+        );
+
+        while (walker.nextNode()) {
+          textNodes.push(walker.currentNode);
+        }
+
+        textNodes.forEach(removeHashtagTextNode);
+      },
+    );
+  }
+
+  function hasMeaningfulExpandedDescriptionContent(expanded) {
+    const textWithoutHashtags = getElementText(expanded)
+      .replace(HASHTAG_TEXT_PATTERN, "$1")
+      .trim();
+
+    if (textWithoutHashtags) {
+      return true;
+    }
+
+    return Boolean(
+      expanded.querySelector(
+        [
+          'a:not([href^="/hashtag/"]):not([href*="youtube.com/hashtag/"])',
+          "button",
+          "img",
+          "svg",
+          "video",
+          "yt-img-shadow",
+        ].join(","),
+      ),
+    );
+  }
+
+  function setExpandedDescriptionCollapsed(expanded, collapsed) {
+    if (collapsed) {
+      expanded.dataset[DESCRIPTION_EXPANDED_COLLAPSED_DATASET_KEY] = "1";
+      expanded.style.setProperty("display", "none", "important");
+      expanded.style.setProperty("height", "0", "important");
+      expanded.style.setProperty("min-height", "0", "important");
+      expanded.style.setProperty("margin", "0", "important");
+      expanded.style.setProperty("padding", "0", "important");
+      return;
+    }
+
+    if (
+      expanded.dataset[DESCRIPTION_EXPANDED_COLLAPSED_DATASET_KEY] !== "1"
+    ) {
+      return;
+    }
+
+    delete expanded.dataset[DESCRIPTION_EXPANDED_COLLAPSED_DATASET_KEY];
+    ["display", "height", "min-height", "margin", "padding"].forEach(
+      (property) => expanded.style.removeProperty(property),
+    );
+  }
+
+  function collapseEmptyExpandedDescriptions(root = document) {
+    collectMatchingElements(root, DESCRIPTION_EXPANDED_SELECTOR).forEach(
+      (expanded) => {
+        setExpandedDescriptionCollapsed(
+          expanded,
+          !hasMeaningfulExpandedDescriptionContent(expanded),
+        );
+      },
+    );
+  }
+
   function hideHashtags(root = document) {
     if (!CONFIG.hideHashtags || !isWatchPath()) {
       return;
@@ -877,6 +1010,8 @@
     collectMatchingElements(root, HASHTAG_LINK_SELECTOR).forEach(
       removeHashtagLink,
     );
+    removeHashtagText(root);
+    collapseEmptyExpandedDescriptions(root);
   }
 
   function buildVolumeOverlayCss() {
@@ -1021,6 +1156,15 @@
         ytd-watch-flexy span:has(> a[href^="/hashtag/"]:only-child),
         ytd-watch-flexy span:has(> a[href*="youtube.com/hashtag/"]:only-child) {
           display: none !important;
+        }
+
+        ytd-watch-flexy ytd-watch-metadata ytd-text-inline-expander #expanded[${DESCRIPTION_EXPANDED_COLLAPSED_ATTRIBUTE}="1"],
+        ytd-watch-flexy ytd-watch-metadata #description-inline-expander #expanded[${DESCRIPTION_EXPANDED_COLLAPSED_ATTRIBUTE}="1"] {
+          display: none !important;
+          height: 0 !important;
+          margin: 0 !important;
+          min-height: 0 !important;
+          padding: 0 !important;
         }
       `);
     }
