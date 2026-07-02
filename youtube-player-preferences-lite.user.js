@@ -217,6 +217,16 @@
     "ytd-watch-flexy ytd-watch-metadata ytd-text-inline-expander #expanded",
     "ytd-watch-flexy ytd-watch-metadata #description-inline-expander #expanded",
   ].join(",");
+  const DESCRIPTION_HEIGHT_RESET_ANCESTOR_SELECTOR = [
+    "#description",
+    "#description-inner",
+    "#description-inline-expander",
+    "ytd-text-inline-expander",
+  ].join(",");
+  const DESCRIPTION_HEIGHT_RESET_STOP_SELECTOR = [
+    "ytd-watch-metadata",
+    "ytd-video-primary-info-renderer",
+  ].join(",");
   const DESCRIPTION_EXPANDED_COLLAPSED_DATASET_KEY =
     "ytpplExpandedDescriptionCollapsed";
   const DESCRIPTION_EXPANDED_COLLAPSED_ATTRIBUTE =
@@ -1106,13 +1116,51 @@
     ].forEach((property) => expanded.style.removeProperty(property));
   }
 
+  function hasRenderedBox(el) {
+    const rect = el.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0;
+  }
+
+  function getExpandedDescriptionHeightResetElements(expanded) {
+    const elements = new Set([expanded]);
+
+    for (
+      let el = expanded.parentElement;
+      el && !el.matches(DESCRIPTION_HEIGHT_RESET_STOP_SELECTOR);
+      el = el.parentElement
+    ) {
+      if (el.matches(DESCRIPTION_HEIGHT_RESET_ANCESTOR_SELECTOR)) {
+        elements.add(el);
+      }
+    }
+
+    return elements;
+  }
+
+  function normaliseExpandedDescriptionHeight(expanded) {
+    if (
+      expanded.dataset[DESCRIPTION_EXPANDED_COLLAPSED_DATASET_KEY] === "1" ||
+      !hasRenderedBox(expanded) ||
+      !hasMeaningfulExpandedDescriptionContent(expanded)
+    ) {
+      return;
+    }
+
+    getExpandedDescriptionHeightResetElements(expanded).forEach((el) => {
+      el.style.setProperty("height", "auto", "important");
+      el.style.setProperty("min-height", "0", "important");
+    });
+    expanded.style.setProperty("max-height", "none", "important");
+  }
+
   function collapseEmptyExpandedDescriptions(root = document) {
     collectMatchingElements(root, DESCRIPTION_EXPANDED_SELECTOR).forEach(
       (expanded) => {
-        setExpandedDescriptionCollapsed(
-          expanded,
-          !hasMeaningfulExpandedDescriptionContent(expanded),
-        );
+        const hasContent = hasMeaningfulExpandedDescriptionContent(expanded);
+        setExpandedDescriptionCollapsed(expanded, !hasContent);
+        if (hasContent) {
+          normaliseExpandedDescriptionHeight(expanded);
+        }
       },
     );
   }
@@ -1770,7 +1818,7 @@
       return;
     }
 
-    [0, 100, 300].forEach((delay) => {
+    [0, 100, 300, 800, 1500].forEach((delay) => {
       setTimeout(() => runDescriptionCleanup(document), delay);
     });
   }
