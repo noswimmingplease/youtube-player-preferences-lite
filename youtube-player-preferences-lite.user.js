@@ -824,35 +824,60 @@
     });
   }
 
-  function isRemovableBlankNode(node) {
-    if (!node) {
-      return false;
+  function getPreviousNonWhitespaceSibling(node) {
+    let previous = node && node.previousSibling;
+    while (
+      previous &&
+      previous.nodeType === Node.TEXT_NODE &&
+      !previous.textContent.trim()
+    ) {
+      previous = previous.previousSibling;
     }
 
-    if (node.nodeType === Node.TEXT_NODE) {
-      return !node.textContent.trim();
-    }
-
-    return (
-      node.nodeType === Node.ELEMENT_NODE &&
-      ["BR", "WBR"].includes(node.tagName)
-    );
+    return previous;
   }
 
-  function removeAdjacentBlankNodes(node) {
-    let previous = node.previousSibling;
-    while (isRemovableBlankNode(previous)) {
-      const current = previous;
-      previous = previous.previousSibling;
-      current.remove();
+  function removeTrailingBreakAfter(node) {
+    let next = node && node.nextSibling;
+    const blankTextNodes = [];
+    while (
+      next &&
+      next.nodeType === Node.TEXT_NODE &&
+      !next.textContent.trim()
+    ) {
+      blankTextNodes.push(next);
+      next = next.nextSibling;
     }
 
-    let next = node.nextSibling;
-    while (isRemovableBlankNode(next)) {
-      const current = next;
-      next = next.nextSibling;
-      current.remove();
+    if (
+      next &&
+      next.nodeType === Node.ELEMENT_NODE &&
+      ["BR", "WBR"].includes(next.tagName)
+    ) {
+      blankTextNodes.forEach((textNode) => textNode.remove());
+      next.remove();
     }
+  }
+
+  function collapseDuplicateBreakBefore(node) {
+    const previous = getPreviousNonWhitespaceSibling(node);
+    const previousPrevious = getPreviousNonWhitespaceSibling(previous);
+
+    if (
+      previous &&
+      previousPrevious &&
+      previous.nodeType === Node.ELEMENT_NODE &&
+      previousPrevious.nodeType === Node.ELEMENT_NODE &&
+      ["BR", "WBR"].includes(previous.tagName) &&
+      ["BR", "WBR"].includes(previousPrevious.tagName)
+    ) {
+      previous.remove();
+    }
+  }
+
+  function removeHashtagOnlyRowBreaks(node) {
+    removeTrailingBreakAfter(node);
+    collapseDuplicateBreakBefore(node);
   }
 
   function isEmptyHashtagWrapper(el) {
@@ -877,7 +902,7 @@
     let el = startEl;
     while (isEmptyHashtagWrapper(el)) {
       const parent = el.parentElement;
-      removeAdjacentBlankNodes(el);
+      removeHashtagOnlyRowBreaks(el);
       el.remove();
       el = parent;
     }
@@ -890,32 +915,56 @@
 
     const parent = link.parentElement;
     link.dataset.ytpplHashtagRemoved = "1";
-    removeAdjacentBlankNodes(link);
+    removeHashtagOnlyRowBreaks(link);
     link.remove();
     removeEmptyHashtagWrappers(parent);
   }
 
   function cleanHashtagText(text) {
-    return String(text || "")
+    const outputLines = [];
+    let removedHashtagOnlyLine = false;
+
+    String(text || "")
       .split(/\r?\n/)
-      .filter((line) => !HASHTAG_ONLY_LINE_PATTERN.test(line))
-      .map((line) =>
-        line
+      .forEach((line) => {
+        if (HASHTAG_ONLY_LINE_PATTERN.test(line)) {
+          removedHashtagOnlyLine = true;
+          return;
+        }
+
+        const cleanedLine = line
           .replace(HASHTAG_TEXT_PATTERN, "$1")
           .replace(/[ \t]{2,}/g, " ")
-          .trimEnd(),
-      )
-      .join("\n")
-      .replace(/\n{3,}/g, "\n\n")
-      .trimEnd();
-  }
+          .trimEnd();
 
-  function collapseBlankRowsInText(text) {
-    return String(text || "")
-      .split(/\r?\n/)
-      .map((line) => line.trimEnd())
-      .filter((line) => line.trim())
-      .join("\n");
+        if (!cleanedLine.trim()) {
+          if (!removedHashtagOnlyLine) {
+            outputLines.push(cleanedLine);
+          }
+          return;
+        }
+
+        if (
+          removedHashtagOnlyLine &&
+          outputLines.length &&
+          !outputLines[outputLines.length - 1].trim()
+        ) {
+          outputLines.pop();
+        }
+
+        outputLines.push(cleanedLine);
+        removedHashtagOnlyLine = false;
+      });
+
+    if (
+      removedHashtagOnlyLine &&
+      outputLines.length &&
+      !outputLines[outputLines.length - 1].trim()
+    ) {
+      outputLines.pop();
+    }
+
+    return outputLines.join("\n").trimEnd();
   }
 
   function removeHashtagTextNode(node) {
@@ -930,7 +979,7 @@
     }
 
     const parent = node.parentElement;
-    removeAdjacentBlankNodes(node);
+    removeHashtagOnlyRowBreaks(node);
     node.remove();
     removeEmptyHashtagWrappers(parent);
   }
@@ -958,49 +1007,6 @@
         textNodes.forEach(removeHashtagTextNode);
       },
     );
-  }
-
-  function collapseBlankRowsInTextNode(node) {
-    if (!node || !/[\r\n]/.test(node.textContent || "")) {
-      return;
-    }
-
-    const cleanedText = collapseBlankRowsInText(node.textContent);
-    if (cleanedText) {
-      node.textContent = cleanedText;
-      return;
-    }
-
-    const parent = node.parentElement;
-    removeAdjacentBlankNodes(node);
-    node.remove();
-    removeEmptyHashtagWrappers(parent);
-  }
-
-  function getPreviousNonWhitespaceSibling(node) {
-    let previous = node && node.previousSibling;
-    while (
-      previous &&
-      previous.nodeType === Node.TEXT_NODE &&
-      !previous.textContent.trim()
-    ) {
-      previous = previous.previousSibling;
-    }
-
-    return previous;
-  }
-
-  function collapseRepeatedDescriptionBreaks(container) {
-    container.querySelectorAll("br, wbr").forEach((breakEl) => {
-      const previous = getPreviousNonWhitespaceSibling(breakEl);
-      if (
-        previous &&
-        previous.nodeType === Node.ELEMENT_NODE &&
-        ["BR", "WBR"].includes(previous.tagName)
-      ) {
-        breakEl.remove();
-      }
-    });
   }
 
   function getMeaningfulDescriptionText(container) {
@@ -1115,30 +1121,6 @@
     if (!CONFIG.collapseDescriptionBlankRows || !isWatchPath()) {
       return;
     }
-
-    collectMatchingElements(root, DESCRIPTION_TEXT_ROOT_SELECTOR).forEach(
-      (container) => {
-        const textNodes = [];
-        const walker = document.createTreeWalker(
-          container,
-          NodeFilter.SHOW_TEXT,
-          {
-            acceptNode(node) {
-              return /[\r\n]/.test(node.textContent || "")
-                ? NodeFilter.FILTER_ACCEPT
-                : NodeFilter.FILTER_REJECT;
-            },
-          },
-        );
-
-        while (walker.nextNode()) {
-          textNodes.push(walker.currentNode);
-        }
-
-        textNodes.forEach(collapseBlankRowsInTextNode);
-        collapseRepeatedDescriptionBreaks(container);
-      },
-    );
 
     collapseEmptyExpandedDescriptions(root);
   }
