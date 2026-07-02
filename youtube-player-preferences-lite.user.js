@@ -29,6 +29,7 @@
     hideStatementBanners: true,
     hideMetadataTeaserCarousel: true,
     hideHashtags: true,
+    collapseDescriptionBlankRows: true,
     hideStructuredDescription: true,
     hideChat: true,
     hideInfoCardsAndEndScreens: true,
@@ -196,7 +197,7 @@
   const HASHTAG_TEXT_PATTERN = /(^|\s)#[^\s#]+/g;
   const HASHTAG_TEXT_TEST_PATTERN = /#[^\s#]+/;
   const HASHTAG_ONLY_LINE_PATTERN = /^\s*(?:#[^\s#]+\s*)+$/;
-  const HASHTAG_TEXT_ROOT_SELECTOR = [
+  const DESCRIPTION_TEXT_ROOT_SELECTOR = [
     "ytd-watch-flexy ytd-watch-metadata #description",
     "ytd-watch-flexy ytd-watch-metadata #description-inner",
     "ytd-watch-flexy ytd-watch-metadata #description-inline-expander",
@@ -220,6 +221,12 @@
     "ytpplExpandedDescriptionCollapsed";
   const DESCRIPTION_EXPANDED_COLLAPSED_ATTRIBUTE =
     "data-ytppl-expanded-description-collapsed";
+  const DESCRIPTION_CONTROL_SELECTOR = [
+    "button",
+    "tp-yt-paper-button",
+    "ytd-button-renderer",
+    "[role='button']",
+  ].join(",");
   const QUALITY_LEVELS_HIGH_TO_LOW = [
     "highres",
     "hd4320",
@@ -903,6 +910,14 @@
       .trimEnd();
   }
 
+  function collapseBlankRowsInText(text) {
+    return String(text || "")
+      .split(/\r?\n/)
+      .map((line) => line.trimEnd())
+      .filter((line) => line.trim())
+      .join("\n");
+  }
+
   function removeHashtagTextNode(node) {
     if (!node || !HASHTAG_TEXT_TEST_PATTERN.test(node.textContent || "")) {
       return;
@@ -921,7 +936,7 @@
   }
 
   function removeHashtagText(root = document) {
-    collectMatchingElements(root, HASHTAG_TEXT_ROOT_SELECTOR).forEach(
+    collectMatchingElements(root, DESCRIPTION_TEXT_ROOT_SELECTOR).forEach(
       (container) => {
         const textNodes = [];
         const walker = document.createTreeWalker(
@@ -945,27 +960,93 @@
     );
   }
 
-  function hasMeaningfulExpandedDescriptionContent(expanded) {
-    const textWithoutHashtags = getElementText(expanded)
+  function collapseBlankRowsInTextNode(node) {
+    if (!node || !/[\r\n]/.test(node.textContent || "")) {
+      return;
+    }
+
+    const cleanedText = collapseBlankRowsInText(node.textContent);
+    if (cleanedText) {
+      node.textContent = cleanedText;
+      return;
+    }
+
+    const parent = node.parentElement;
+    removeAdjacentBlankNodes(node);
+    node.remove();
+    removeEmptyHashtagWrappers(parent);
+  }
+
+  function getPreviousNonWhitespaceSibling(node) {
+    let previous = node && node.previousSibling;
+    while (
+      previous &&
+      previous.nodeType === Node.TEXT_NODE &&
+      !previous.textContent.trim()
+    ) {
+      previous = previous.previousSibling;
+    }
+
+    return previous;
+  }
+
+  function collapseRepeatedDescriptionBreaks(container) {
+    container.querySelectorAll("br, wbr").forEach((breakEl) => {
+      const previous = getPreviousNonWhitespaceSibling(breakEl);
+      if (
+        previous &&
+        previous.nodeType === Node.ELEMENT_NODE &&
+        ["BR", "WBR"].includes(previous.tagName)
+      ) {
+        removeAdjacentBlankNodes(breakEl);
+        breakEl.remove();
+      }
+    });
+  }
+
+  function getMeaningfulDescriptionText(container) {
+    const parts = [];
+    const walker = document.createTreeWalker(
+      container,
+      NodeFilter.SHOW_TEXT,
+      {
+        acceptNode(node) {
+          return closestElement(node, DESCRIPTION_CONTROL_SELECTOR)
+            ? NodeFilter.FILTER_REJECT
+            : NodeFilter.FILTER_ACCEPT;
+        },
+      },
+    );
+
+    while (walker.nextNode()) {
+      parts.push(walker.currentNode.textContent);
+    }
+
+    return parts
+      .join(" ")
       .replace(HASHTAG_TEXT_PATTERN, "$1")
+      .replace(/\bShow\s+(?:less|more)\b/gi, "")
+      .replace(/\s+/g, " ")
       .trim();
+  }
+
+  function hasMeaningfulExpandedDescriptionContent(expanded) {
+    const textWithoutHashtags = getMeaningfulDescriptionText(expanded);
 
     if (textWithoutHashtags) {
       return true;
     }
 
-    return Boolean(
-      expanded.querySelector(
+    return Array.from(
+      expanded.querySelectorAll(
         [
           'a:not([href^="/hashtag/"]):not([href*="youtube.com/hashtag/"])',
-          "button",
           "img",
-          "svg",
           "video",
           "yt-img-shadow",
         ].join(","),
       ),
-    );
+    ).some((el) => !closestElement(el, DESCRIPTION_CONTROL_SELECTOR));
   }
 
   function setExpandedDescriptionCollapsed(expanded, collapsed) {
@@ -1002,6 +1083,38 @@
     );
   }
 
+  function collapseDescriptionBlankRows(root = document) {
+    if (!CONFIG.collapseDescriptionBlankRows || !isWatchPath()) {
+      return;
+    }
+
+    collectMatchingElements(root, DESCRIPTION_TEXT_ROOT_SELECTOR).forEach(
+      (container) => {
+        const textNodes = [];
+        const walker = document.createTreeWalker(
+          container,
+          NodeFilter.SHOW_TEXT,
+          {
+            acceptNode(node) {
+              return /[\r\n]/.test(node.textContent || "")
+                ? NodeFilter.FILTER_ACCEPT
+                : NodeFilter.FILTER_REJECT;
+            },
+          },
+        );
+
+        while (walker.nextNode()) {
+          textNodes.push(walker.currentNode);
+        }
+
+        textNodes.forEach(collapseBlankRowsInTextNode);
+        collapseRepeatedDescriptionBreaks(container);
+      },
+    );
+
+    collapseEmptyExpandedDescriptions(root);
+  }
+
   function hideHashtags(root = document) {
     if (!CONFIG.hideHashtags || !isWatchPath()) {
       return;
@@ -1011,7 +1124,6 @@
       removeHashtagLink,
     );
     removeHashtagText(root);
-    collapseEmptyExpandedDescriptions(root);
   }
 
   function buildVolumeOverlayCss() {
@@ -1607,6 +1719,7 @@
     hideWatchedVideos(root);
     normaliseReturnYoutubeDislikeButtons(root);
     hideHashtags(root);
+    collapseDescriptionBlankRows(root);
     hideWatchActionButtons(root);
     hideWatchActionMenuItems(root);
     scheduleHighestQualityAttempts();
