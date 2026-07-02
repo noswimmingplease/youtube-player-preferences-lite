@@ -28,6 +28,7 @@
     hideMerchShelf: true,
     hideStatementBanners: true,
     hideMetadataTeaserCarousel: true,
+    hideHashtags: true,
     hideStructuredDescription: true,
     hideChat: true,
     hideInfoCardsAndEndScreens: true,
@@ -913,6 +914,21 @@
     if (CONFIG.hideMetadataTeaserCarousel) {
       rules.push(`
         ytd-watch-flexy ytd-watch-metadata #teaser-carousel {
+          display: none !important;
+        }
+      `);
+    }
+
+    if (CONFIG.hideHashtags) {
+      rules.push(`
+        ytd-watch-flexy ytd-watch-metadata a[href^="/hashtag/"],
+        ytd-watch-flexy ytd-watch-metadata a[href*="youtube.com/hashtag/"],
+        ytd-watch-flexy ytd-video-primary-info-renderer a[href^="/hashtag/"],
+        ytd-watch-flexy ytd-video-primary-info-renderer a[href*="youtube.com/hashtag/"],
+        ytd-watch-flexy yt-chip-cloud-chip-renderer a[href^="/hashtag/"],
+        ytd-watch-flexy yt-chip-cloud-chip-renderer a[href*="youtube.com/hashtag/"],
+        ytd-watch-flexy span:has(> a[href^="/hashtag/"]:only-child),
+        ytd-watch-flexy span:has(> a[href*="youtube.com/hashtag/"]:only-child) {
           display: none !important;
         }
       `);
