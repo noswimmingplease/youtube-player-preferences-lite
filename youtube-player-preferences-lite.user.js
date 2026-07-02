@@ -24,6 +24,7 @@
     hideAskButton: true,
     hideThanksButton: true,
     hideShareButton: true,
+    hideJoinButton: true,
     hideMerchShelf: true,
     hideStatementBanners: true,
     hideMetadataTeaserCarousel: true,
@@ -867,6 +868,16 @@
     if (CONFIG.hideMerchShelf) {
       rules.push(`
         ytd-watch-flexy ytd-merch-shelf-renderer {
+          display: none !important;
+        }
+      `);
+    }
+
+    if (CONFIG.hideJoinButton) {
+      rules.push(`
+        ytd-watch-flexy ytd-video-owner-renderer #sponsor-button,
+        ytd-watch-flexy ytd-video-owner-renderer yt-button-view-model:has(a[href*="/channel/"][href*="/join"]),
+        ytd-watch-flexy ytd-video-owner-renderer button-view-model:has(a[href*="/channel/"][href*="/join"]) {
           display: none !important;
         }
       `);
