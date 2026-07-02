@@ -191,6 +191,16 @@
     "yt-icon",
     `.${RESTORED_DISLIKE_ICON_CLASS}`,
   ].join(",");
+  const HASHTAG_LINK_SELECTOR =
+    'a[href^="/hashtag/"], a[href*="youtube.com/hashtag/"]';
+  const HASHTAG_EMPTY_ANCESTOR_STOP_SELECTOR = [
+    "ytd-watch-metadata",
+    "ytd-video-primary-info-renderer",
+    "#description",
+    "#description-inner",
+    "#description-inline-expander",
+    "ytd-text-inline-expander",
+  ].join(",");
   const QUALITY_LEVELS_HIGH_TO_LOW = [
     "highres",
     "hd4320",
@@ -788,6 +798,87 @@
     });
   }
 
+  function isRemovableBlankNode(node) {
+    if (!node) {
+      return false;
+    }
+
+    if (node.nodeType === Node.TEXT_NODE) {
+      return !node.textContent.trim();
+    }
+
+    return (
+      node.nodeType === Node.ELEMENT_NODE &&
+      ["BR", "WBR"].includes(node.tagName)
+    );
+  }
+
+  function removeAdjacentBlankNodes(node) {
+    let previous = node.previousSibling;
+    while (isRemovableBlankNode(previous)) {
+      const current = previous;
+      previous = previous.previousSibling;
+      current.remove();
+    }
+
+    let next = node.nextSibling;
+    while (isRemovableBlankNode(next)) {
+      const current = next;
+      next = next.nextSibling;
+      current.remove();
+    }
+  }
+
+  function isEmptyHashtagWrapper(el) {
+    return (
+      el &&
+      el.nodeType === Node.ELEMENT_NODE &&
+      !el.matches(HASHTAG_EMPTY_ANCESTOR_STOP_SELECTOR) &&
+      !getElementText(el) &&
+      !el.querySelector(
+        [
+          "a:not([data-ytppl-hashtag-removed])",
+          "button",
+          "img",
+          "svg",
+          "video",
+        ].join(","),
+      )
+    );
+  }
+
+  function removeEmptyHashtagWrappers(startEl) {
+    let el = startEl;
+    while (isEmptyHashtagWrapper(el)) {
+      const parent = el.parentElement;
+      removeAdjacentBlankNodes(el);
+      el.remove();
+      el = parent;
+    }
+  }
+
+  function removeHashtagLink(link) {
+    if (!link || link.dataset.ytpplHashtagRemoved === "1") {
+      return;
+    }
+
+    const parent = link.parentElement;
+    link.dataset.ytpplHashtagRemoved = "1";
+    removeAdjacentBlankNodes(link);
+    link.remove();
+    removeEmptyHashtagWrappers(parent);
+  }
+
+  function hideHashtags(root = document) {
+    if (!CONFIG.hideHashtags || !isWatchPath()) {
+      return;
+    }
+
+    collectMatchingElements(root, HASHTAG_LINK_SELECTOR).forEach(
+      removeHashtagLink,
+    );
+  }
+
   function buildVolumeOverlayCss() {
     return `
       .${VOLUME_OVERLAY_CLASS} {
@@ -1371,6 +1462,7 @@
     hidePayToWatchCards(root);
     hideWatchedVideos(root);
     normaliseReturnYoutubeDislikeButtons(root);
+    hideHashtags(root);
     hideWatchActionButtons(root);
     hideWatchActionMenuItems(root);
     scheduleHighestQualityAttempts();
