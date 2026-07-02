@@ -1018,15 +1018,34 @@
     );
 
     while (walker.nextNode()) {
-      parts.push(walker.currentNode.textContent);
+      const text = walker.currentNode.textContent
+        .replace(HASHTAG_TEXT_PATTERN, "$1")
+        .replace(/\bShow\s+(?:less|more)\b/gi, "")
+        .replace(/\s+/g, " ")
+        .trim();
+
+      if (text && hasVisibleTextRange(walker.currentNode)) {
+        parts.push(text);
+      }
     }
 
-    return parts
-      .join(" ")
-      .replace(HASHTAG_TEXT_PATTERN, "$1")
-      .replace(/\bShow\s+(?:less|more)\b/gi, "")
-      .replace(/\s+/g, " ")
-      .trim();
+    return parts.join(" ").trim();
+  }
+
+  function hasVisibleTextRange(node) {
+    const range = document.createRange();
+    try {
+      range.selectNodeContents(node);
+      return Array.from(range.getClientRects()).some(
+        (rect) => rect.width > 0 && rect.height > 0,
+      );
+    } catch {
+      return false;
+    } finally {
+      if (typeof range.detach === "function") {
+        range.detach();
+      }
+    }
   }
 
   function hasMeaningfulExpandedDescriptionContent(expanded) {
@@ -1053,8 +1072,11 @@
       expanded.dataset[DESCRIPTION_EXPANDED_COLLAPSED_DATASET_KEY] = "1";
       expanded.style.setProperty("display", "none", "important");
       expanded.style.setProperty("height", "0", "important");
+      expanded.style.setProperty("line-height", "0", "important");
+      expanded.style.setProperty("max-height", "0", "important");
       expanded.style.setProperty("min-height", "0", "important");
       expanded.style.setProperty("margin", "0", "important");
+      expanded.style.setProperty("overflow", "hidden", "important");
       expanded.style.setProperty("padding", "0", "important");
       return;
     }
@@ -1066,9 +1088,16 @@
     }
 
     delete expanded.dataset[DESCRIPTION_EXPANDED_COLLAPSED_DATASET_KEY];
-    ["display", "height", "min-height", "margin", "padding"].forEach(
-      (property) => expanded.style.removeProperty(property),
-    );
+    [
+      "display",
+      "height",
+      "line-height",
+      "max-height",
+      "min-height",
+      "margin",
+      "overflow",
+      "padding",
+    ].forEach((property) => expanded.style.removeProperty(property));
   }
 
   function collapseEmptyExpandedDescriptions(root = document) {
@@ -1123,6 +1152,11 @@
       removeHashtagLink,
     );
     removeHashtagText(root);
+  }
+
+  function runDescriptionCleanup(root = document) {
+    hideHashtags(root);
+    collapseDescriptionBlankRows(root);
   }
 
   function buildVolumeOverlayCss() {
@@ -1273,8 +1307,11 @@
         ytd-watch-flexy ytd-watch-metadata #description-inline-expander #expanded[${DESCRIPTION_EXPANDED_COLLAPSED_ATTRIBUTE}="1"] {
           display: none !important;
           height: 0 !important;
+          line-height: 0 !important;
           margin: 0 !important;
+          max-height: 0 !important;
           min-height: 0 !important;
+          overflow: hidden !important;
           padding: 0 !important;
         }
       `);
@@ -1717,8 +1754,7 @@
     hidePayToWatchCards(root);
     hideWatchedVideos(root);
     normaliseReturnYoutubeDislikeButtons(root);
-    hideHashtags(root);
-    collapseDescriptionBlankRows(root);
+    runDescriptionCleanup(root);
     hideWatchActionButtons(root);
     hideWatchActionMenuItems(root);
     scheduleHighestQualityAttempts();
@@ -1732,6 +1768,19 @@
   function handleNavigateFinish() {
     theaterModeUserDisabled = false;
     applyPreferences(document);
+  }
+
+  function handleDescriptionClick(event) {
+    if (!CONFIG.collapseDescriptionBlankRows || !isWatchPath()) {
+      return;
+    }
+    if (!closestElement(event.target, DESCRIPTION_TEXT_ROOT_SELECTOR)) {
+      return;
+    }
+
+    [0, 100, 300].forEach((delay) => {
+      setTimeout(() => runDescriptionCleanup(document), delay);
+    });
   }
 
   function scheduleApply(root = document) {
@@ -1781,6 +1830,7 @@
 
   document.addEventListener("click", handleShortsClick, true);
   document.addEventListener("click", handleTheaterModeToggle, true);
+  document.addEventListener("click", handleDescriptionClick, true);
   document.addEventListener("wheel", handleWheelVolume, {
     capture: true,
     passive: false,
