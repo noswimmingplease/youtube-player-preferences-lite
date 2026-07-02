@@ -25,6 +25,7 @@
     hideThanksButton: true,
     hideShareButton: true,
     hideMerchShelf: true,
+    hideStatementBanners: true,
     hideMetadataTeaserCarousel: true,
     hideStructuredDescription: true,
     hideChat: true,
@@ -866,6 +867,16 @@
     if (CONFIG.hideMerchShelf) {
       rules.push(`
         ytd-watch-flexy ytd-merch-shelf-renderer {
+          display: none !important;
+        }
+      `);
+    }
+
+    if (CONFIG.hideStatementBanners) {
+      rules.push(`
+        ytd-watch-flexy ytd-statement-banner-renderer,
+        ytd-watch-flexy yt-statement-banner-view-model,
+        ytd-watch-flexy .ytStatementBannerViewModelHost {
           display: none !important;
         }
       `);
