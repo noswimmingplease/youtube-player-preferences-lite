@@ -998,7 +998,6 @@
         previous.nodeType === Node.ELEMENT_NODE &&
         ["BR", "WBR"].includes(previous.tagName)
       ) {
-        removeAdjacentBlankNodes(breakEl);
         breakEl.remove();
       }
     });
