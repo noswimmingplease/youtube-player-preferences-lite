@@ -32,6 +32,8 @@
     hideChat: true,
     hideInfoCardsAndEndScreens: true,
     enableTheaterMode: true,
+    enableHighestQuality: true,
+    highestQualityRetryDelays: [0, 300, 1000, 2500, 5000, 10000],
     enablePlayerWheelVolume: true,
     requireRightMouseButtonForWheelVolume: true,
     wheelVolumeStep: 5,
@@ -188,10 +190,25 @@
     "yt-icon",
     `.${RESTORED_DISLIKE_ICON_CLASS}`,
   ].join(",");
+  const QUALITY_LEVELS_HIGH_TO_LOW = [
+    "highres",
+    "hd4320",
+    "hd2880",
+    "hd2160",
+    "hd1440",
+    "hd1080",
+    "hd720",
+    "large",
+    "medium",
+    "small",
+    "tiny",
+  ];
 
   let scheduled = false;
   let legacyActionHiddenCleared = false;
   let theaterModeUserDisabled = false;
+  let highestQualityVideoKey = "";
+  let highestQualityRetryTimers = [];
   let rightButtonHeldOnPlayer = false;
   let suppressNextContextMenu = false;
   let volumeOverlayHideTimer = 0;
@@ -1100,6 +1117,93 @@
     theaterModeUserDisabled = isTheaterModeEnabled();
   }
 
+  function getVideoKey() {
+    if (!isWatchPath()) {
+      return "";
+    }
+
+    const videoId = new URLSearchParams(location.search).get("v") || "";
+    return `${location.pathname}:${videoId}`;
+  }
+
+  function getHighestQualityLevel(levels) {
+    if (!Array.isArray(levels) || !levels.length) {
+      return "";
+    }
+
+    return (
+      QUALITY_LEVELS_HIGH_TO_LOW.find((quality) => levels.includes(quality)) ||
+      levels.find((quality) => quality && quality !== "auto") ||
+      ""
+    );
+  }
+
+  function clearHighestQualityRetryTimers() {
+    highestQualityRetryTimers.forEach((timerId) => clearTimeout(timerId));
+    highestQualityRetryTimers = [];
+  }
+
+  function setHighestPlaybackQuality() {
+    if (!CONFIG.enableHighestQuality || !isWatchPath()) {
+      return false;
+    }
+
+    const player = document.querySelector("#movie_player");
+    if (!player || typeof player.getAvailableQualityLevels !== "function") {
+      return false;
+    }
+
+    let levels;
+    try {
+      levels = player.getAvailableQualityLevels();
+    } catch {
+      return false;
+    }
+
+    const quality = getHighestQualityLevel(levels);
+    if (!quality) {
+      return false;
+    }
+
+    try {
+      if (typeof player.setPlaybackQualityRange === "function") {
+        player.setPlaybackQualityRange(quality, quality);
+      }
+      if (typeof player.setPlaybackQuality === "function") {
+        player.setPlaybackQuality(quality);
+      }
+    } catch {
+      return false;
+    }
+
+    return true;
+  }
+
+  function scheduleHighestQualityAttempts() {
+    if (!CONFIG.enableHighestQuality || !isWatchPath()) {
+      highestQualityVideoKey = "";
+      clearHighestQualityRetryTimers();
+      return;
+    }
+
+    const videoKey = getVideoKey();
+    if (!videoKey || videoKey === highestQualityVideoKey) {
+      return;
+    }
+
+    highestQualityVideoKey = videoKey;
+    clearHighestQualityRetryTimers();
+
+    highestQualityRetryTimers = CONFIG.highestQualityRetryDelays.map(
+      (delay) =>
+        setTimeout(() => {
+          if (highestQualityVideoKey === videoKey) {
+            setHighestPlaybackQuality();
+          }
+        }, delay),
+    );
+  }
+
   function getPlayerFromTarget(target) {
     if (!target || isExcludedSurface(target)) {
       return null;
@@ -1253,6 +1357,7 @@
     normaliseReturnYoutubeDislikeButtons(root);
     hideWatchActionButtons(root);
     hideWatchActionMenuItems(root);
+    scheduleHighestQualityAttempts();
 
     if (isWatchPath()) {
       setTimeout(enableTheaterMode, 300);
