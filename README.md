@@ -36,6 +36,28 @@ Install Tampermonkey first, then install this userscript. Tampermonkey officiall
 
 ## Install This Script
 
+### Direct install from GitHub
+
+1. Open the latest release for this repository.
+2. Open or download `youtube-player-preferences-lite.user.js`.
+3. Tampermonkey should show an install page.
+4. Review the script, then select **Install**.
+
+### Import URL
+
+If your Tampermonkey build provides an import-from-URL option, use this release URL:
+
+~~~text
+https://github.com/Ci303/youtube-player-preferences-lite/releases/latest/download/youtube-player-preferences-lite.user.js
+~~~
+
+### Manual import
+
+1. Download `youtube-player-preferences-lite.user.js` from the latest release.
+2. Open the Tampermonkey Dashboard.
+3. Open the **Utilities** tab.
+4. Use the import option and select the downloaded `.user.js` file.
+
 ### Copy and paste fallback
 
 1. Open the Tampermonkey Dashboard.
@@ -43,14 +65,10 @@ Install Tampermonkey first, then install this userscript. Tampermonkey officiall
 3. Replace the template with the contents of `youtube-player-preferences-lite.user.js`.
 4. Save the script.
 
-### Future direct install URL
-
-If this is published as a private GitHub release, use:
-
-~~~text
-https://github.com/Ci303/youtube-player-preferences-lite/releases/latest/download/youtube-player-preferences-lite.user.js
-~~~
-
 ## Scope
 
 This script avoids `ytd-miniplayer`, playlist panels, and queue panels. If YouTube changes its markup, selector updates may be needed.
+
+## Updating
+
+For the most predictable result, reinstall from the latest GitHub release URL after changes are published.
