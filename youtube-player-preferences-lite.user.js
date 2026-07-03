@@ -127,8 +127,7 @@
   const WATCH_ACTION_HIDDEN_DATASET_KEY = "ytpplActionHidden";
   const WATCH_ACTION_HIDDEN_ATTRIBUTE = "data-ytppl-action-hidden";
   const WATCH_ACTION_HIDDEN_VALUE = "1";
-  const WATCH_ACTION_HIDDEN_SELECTOR =
-    `[${WATCH_ACTION_HIDDEN_ATTRIBUTE}="${WATCH_ACTION_HIDDEN_VALUE}"]`;
+  const WATCH_ACTION_HIDDEN_SELECTOR = `[${WATCH_ACTION_HIDDEN_ATTRIBUTE}="${WATCH_ACTION_HIDDEN_VALUE}"]`;
   const WATCH_ACTION_BUTTON_SELECTOR = [
     "ytd-watch-flexy ytd-menu-renderer yt-button-view-model",
     "ytd-watch-flexy ytd-menu-renderer button-view-model",
@@ -554,10 +553,7 @@
       return value;
     }
 
-    return parseProgressValue(
-      el.getAttribute("value"),
-      el.getAttribute("max"),
-    );
+    return parseProgressValue(el.getAttribute("value"), el.getAttribute("max"));
   }
 
   function getMeasuredWidthPercent(el) {
@@ -742,9 +738,7 @@
         ),
       ) ||
       Boolean(
-        icon.querySelector(
-          "polygon[points], polyline[points], circle, rect",
-        ),
+        icon.querySelector("polygon[points], polyline[points], circle, rect"),
       )
     );
   }
@@ -899,7 +893,7 @@
   function isPreservedWatchActionButton(buttonModel) {
     return Boolean(
       buttonModel.matches(WATCH_ACTION_PRESERVE_SELECTOR) ||
-        closestElement(buttonModel, WATCH_ACTION_PRESERVE_SELECTOR),
+      closestElement(buttonModel, WATCH_ACTION_PRESERVE_SELECTOR),
     );
   }
 
@@ -1177,17 +1171,13 @@
 
   function getMeaningfulDescriptionText(container) {
     const parts = [];
-    const walker = document.createTreeWalker(
-      container,
-      NodeFilter.SHOW_TEXT,
-      {
-        acceptNode(node) {
-          return closestElement(node, DESCRIPTION_CONTROL_SELECTOR)
-            ? NodeFilter.FILTER_REJECT
-            : NodeFilter.FILTER_ACCEPT;
-        },
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, {
+      acceptNode(node) {
+        return closestElement(node, DESCRIPTION_CONTROL_SELECTOR)
+          ? NodeFilter.FILTER_REJECT
+          : NodeFilter.FILTER_ACCEPT;
       },
-    );
+    });
 
     while (walker.nextNode()) {
       const text = walker.currentNode.textContent
@@ -1253,9 +1243,7 @@
       return;
     }
 
-    if (
-      expanded.dataset[DESCRIPTION_EXPANDED_COLLAPSED_DATASET_KEY] !== "1"
-    ) {
+    if (expanded.dataset[DESCRIPTION_EXPANDED_COLLAPSED_DATASET_KEY] !== "1") {
       return;
     }
 
@@ -1846,13 +1834,12 @@
     highestQualityVideoKey = videoKey;
     clearHighestQualityRetryTimers();
 
-    highestQualityRetryTimers = CONFIG.highestQualityRetryDelays.map(
-      (delay) =>
-        setTimeout(() => {
-          if (highestQualityVideoKey === videoKey) {
-            setHighestPlaybackQuality();
-          }
-        }, delay),
+    highestQualityRetryTimers = CONFIG.highestQualityRetryDelays.map((delay) =>
+      setTimeout(() => {
+        if (highestQualityVideoKey === videoKey) {
+          setHighestPlaybackQuality();
+        }
+      }, delay),
     );
   }
 
