@@ -44,7 +44,9 @@
 
   const STYLE_ID = "ytppl-style";
   const VOLUME_OVERLAY_CLASS = "ytppl-volume-overlay";
+  const RESTORED_LIKE_ICON_CLASS = "ytppl-ryd-like-icon";
   const RESTORED_DISLIKE_ICON_CLASS = "ytppl-ryd-dislike-icon";
+  const EMPTY_RYD_ICON_ATTRIBUTE = "data-ytppl-empty-ryd-icon";
   const SHORTS_LINK_SELECTOR =
     'a[href^="/shorts/"], a[href*="youtube.com/shorts/"]';
   const FEED_CARD_CONTAINER_SELECTOR = [
@@ -173,6 +175,17 @@
     "ytd-popup-container",
     "tp-yt-iron-dropdown",
   ].join(",");
+  const RYD_LIKE_BUTTON_SELECTOR = [
+    "ytd-watch-flexy #segmented-like-button button",
+    "ytd-watch-flexy like-button-view-model button",
+    "ytd-watch-flexy #like-button button",
+    'ytd-watch-flexy ytd-menu-renderer button[aria-label^="Like" i]',
+    'ytd-watch-flexy ytd-menu-renderer button[aria-label^="Unlike" i]',
+    'ytd-watch-flexy ytd-menu-renderer button[title^="Like" i]',
+    'ytd-watch-flexy ytd-menu-renderer button[title^="Unlike" i]',
+  ].join(",");
+  const RYD_WATCH_ACTION_BUTTON_SELECTOR =
+    "ytd-watch-flexy ytd-menu-renderer button";
   const RYD_DISLIKE_BUTTON_SELECTOR = [
     "ytd-watch-flexy #segmented-dislike-button button",
     "ytd-watch-flexy dislike-button-view-model button",
@@ -193,7 +206,10 @@
   const RYD_ICON_SELECTOR = [
     ".ytSpecButtonShapeNextIcon",
     ".yt-spec-button-shape-next__icon",
+    ".yt-icon-shape",
     "yt-icon",
+    "yt-icon-shape",
+    `.${RESTORED_LIKE_ICON_CLASS}`,
     `.${RESTORED_DISLIKE_ICON_CLASS}`,
   ].join(",");
   const HASHTAG_LINK_SELECTOR =
@@ -644,12 +660,12 @@
     );
   }
 
-  function createRestoredDislikeIcon() {
+  function createRestoredActionIcon(restoredClassName, pathData) {
     const icon = document.createElement("div");
     icon.className = [
       "ytSpecButtonShapeNextIcon",
       "ytSpecButtonShapeNextElevatedContent",
-      RESTORED_DISLIKE_ICON_CLASS,
+      restoredClassName,
     ].join(" ");
     icon.setAttribute("aria-hidden", "true");
 
@@ -658,14 +674,25 @@
     svg.setAttribute("focusable", "false");
 
     const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    path.setAttribute(
-      "d",
-      "M10 15v4a2 2 0 0 0 2 2l4-7V3H6.5a2 2 0 0 0-1.92 1.44l-2.33 8A2 2 0 0 0 4.17 15H10ZM16 3h2.7A2.3 2.3 0 0 1 21 5.3v6.4a2.3 2.3 0 0 1-2.3 2.3H16",
-    );
+    path.setAttribute("d", pathData);
     svg.appendChild(path);
     icon.appendChild(svg);
 
     return icon;
+  }
+
+  function createRestoredLikeIcon() {
+    return createRestoredActionIcon(
+      RESTORED_LIKE_ICON_CLASS,
+      "M14 9V5a2 2 0 0 0-2-2l-4 7v11h9.5a2 2 0 0 0 1.92-1.44l2.33-8A2 2 0 0 0 19.83 9H14ZM8 21H5.3A2.3 2.3 0 0 1 3 18.7v-6.4A2.3 2.3 0 0 1 5.3 10H8",
+    );
+  }
+
+  function createRestoredDislikeIcon() {
+    return createRestoredActionIcon(
+      RESTORED_DISLIKE_ICON_CLASS,
+      "M10 15v4a2 2 0 0 0 2 2l4-7V3H6.5a2 2 0 0 0-1.92 1.44l-2.33 8A2 2 0 0 0 4.17 15H10ZM16 3h2.7A2.3 2.3 0 0 1 21 5.3v6.4a2.3 2.3 0 0 1-2.3 2.3H16",
+    );
   }
 
   function createRydTextContainer(text) {
@@ -693,6 +720,105 @@
     });
   }
 
+  function applyRydIconLeadingClasses(button) {
+    button.classList.remove(
+      "ytSpecButtonShapeNextIconButton",
+      "yt-spec-button-shape-next--icon-button",
+    );
+    button.classList.add(
+      "ytSpecButtonShapeNextIconLeading",
+      "yt-spec-button-shape-next--icon-leading",
+    );
+  }
+
+  function hasRydIconGraphic(icon) {
+    return (
+      Array.from(icon.querySelectorAll("path")).some((path) =>
+        getNormalisedLabel(path.getAttribute("d")),
+      ) ||
+      Array.from(icon.querySelectorAll("use")).some((use) =>
+        getNormalisedLabel(
+          use.getAttribute("href") || use.getAttribute("xlink:href"),
+        ),
+      ) ||
+      Boolean(
+        icon.querySelector(
+          "polygon[points], polyline[points], circle, rect",
+        ),
+      )
+    );
+  }
+
+  function hasRenderedRydIcon(icon) {
+    const style = getComputedStyle(icon);
+    if (
+      style.display === "none" ||
+      style.visibility === "hidden" ||
+      Number(style.opacity) === 0
+    ) {
+      return false;
+    }
+
+    const rect = icon.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0;
+  }
+
+  function isUsableRydIcon(icon) {
+    return hasRydIconGraphic(icon) && hasRenderedRydIcon(icon);
+  }
+
+  function setEmptyRydIconState(icon, empty) {
+    if (empty) {
+      icon.setAttribute(EMPTY_RYD_ICON_ATTRIBUTE, "1");
+      return;
+    }
+
+    if (icon.getAttribute(EMPTY_RYD_ICON_ATTRIBUTE) === "1") {
+      icon.removeAttribute(EMPTY_RYD_ICON_ATTRIBUTE);
+    }
+  }
+
+  function ensureRydButtonIcon(button, createIcon, restoredClassName) {
+    const restoredIcon = button.querySelector(`.${restoredClassName}`);
+    if (restoredIcon) {
+      setEmptyRydIconState(restoredIcon, false);
+      return;
+    }
+
+    const nativeIcons = Array.from(button.querySelectorAll(RYD_ICON_SELECTOR));
+    const hasUsableNativeIcon = nativeIcons.some((icon) => {
+      const isRestoredIcon = icon.matches(
+        `.${RESTORED_LIKE_ICON_CLASS}, .${RESTORED_DISLIKE_ICON_CLASS}`,
+      );
+      const isUsable = !isRestoredIcon && isUsableRydIcon(icon);
+      setEmptyRydIconState(icon, !isUsable);
+      return isUsable;
+    });
+
+    if (!hasUsableNativeIcon) {
+      button.insertBefore(createIcon(), button.firstChild);
+    }
+  }
+
+  function normaliseRydLikeButton(button) {
+    if (!button || closestElement(button, EXCLUDED_SURFACE_SELECTOR)) {
+      return;
+    }
+
+    const hasText =
+      button.querySelector(RYD_TEXT_CONTAINER_SELECTOR) ||
+      getNormalisedLabel(button.innerText);
+
+    ensureRydButtonIcon(
+      button,
+      createRestoredLikeIcon,
+      RESTORED_LIKE_ICON_CLASS,
+    );
+    if (hasText) {
+      applyRydIconLeadingClasses(button);
+    }
+  }
+
   function normaliseRydDislikeButton(button) {
     if (!button || closestElement(button, EXCLUDED_SURFACE_SELECTOR)) {
       return;
@@ -704,23 +830,41 @@
       textContainer = null;
     }
 
-    if (!button.querySelector(RYD_ICON_SELECTOR)) {
-      button.insertBefore(createRestoredDislikeIcon(), button.firstChild);
-    }
+    ensureRydButtonIcon(
+      button,
+      createRestoredDislikeIcon,
+      RESTORED_DISLIKE_ICON_CLASS,
+    );
 
     if (!textContainer) {
       button.appendChild(createRydTextContainer(existingText));
       removeDirectTextNodes(button);
     }
 
-    button.classList.remove(
-      "ytSpecButtonShapeNextIconButton",
-      "yt-spec-button-shape-next--icon-button",
+    applyRydIconLeadingClasses(button);
+  }
+
+  function hasRydLikeButtonLabel(button) {
+    return getWatchActionLabels(button).some((label) => {
+      return (
+        /^(?:Like|Unlike)\b/i.test(label) ||
+        /\bI like\b/i.test(label) ||
+        /\bLike this\b/i.test(label)
+      );
+    });
+  }
+
+  function normaliseReturnYoutubeLikeButtons(root = document) {
+    const buttons = collectMatchingElements(root, RYD_LIKE_BUTTON_SELECTOR);
+    collectMatchingElements(root, RYD_WATCH_ACTION_BUTTON_SELECTOR).forEach(
+      (button) => {
+        if (hasRydLikeButtonLabel(button)) {
+          buttons.add(button);
+        }
+      },
     );
-    button.classList.add(
-      "ytSpecButtonShapeNextIconLeading",
-      "yt-spec-button-shape-next--icon-leading",
-    );
+
+    buttons.forEach(normaliseRydLikeButton);
   }
 
   function normaliseReturnYoutubeDislikeButtons(root = document) {
@@ -1307,6 +1451,20 @@
           display: none !important;
         }
 
+        ytd-watch-flexy ytd-menu-renderer [${EMPTY_RYD_ICON_ATTRIBUTE}="1"] {
+          display: none !important;
+          flex: 0 0 0 !important;
+          height: 0 !important;
+          margin: 0 !important;
+          min-width: 0 !important;
+          opacity: 0 !important;
+          overflow: hidden !important;
+          padding: 0 !important;
+          visibility: hidden !important;
+          width: 0 !important;
+        }
+
+        ytd-watch-flexy ytd-menu-renderer .${RESTORED_LIKE_ICON_CLASS},
         ytd-watch-flexy ytd-menu-renderer .${RESTORED_DISLIKE_ICON_CLASS} {
           align-items: center !important;
           display: flex !important;
@@ -1318,6 +1476,7 @@
           width: 24px !important;
         }
 
+        ytd-watch-flexy ytd-menu-renderer .${RESTORED_LIKE_ICON_CLASS} svg,
         ytd-watch-flexy ytd-menu-renderer .${RESTORED_DISLIKE_ICON_CLASS} svg {
           display: block !important;
           fill: none !important;
@@ -1839,6 +1998,7 @@
     hideUpcomingStreams(root);
     hidePayToWatchCards(root);
     hideWatchedVideos(root);
+    normaliseReturnYoutubeLikeButtons(root);
     normaliseReturnYoutubeDislikeButtons(root);
     runDescriptionCleanup(root);
     hideWatchActionButtons(root);
@@ -1907,7 +2067,7 @@
   });
 
   observer.observe(document.documentElement, {
-    attributeFilter: ["aria-label", "title"],
+    attributeFilter: ["aria-label", "class", "hidden", "style", "title"],
     attributes: true,
     childList: true,
     characterData: true,
