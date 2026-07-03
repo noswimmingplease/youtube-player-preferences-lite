@@ -1396,9 +1396,17 @@
         letter-spacing: 0 !important;
         text-align: center !important;
         text-shadow:
-          0 1px 2px rgba(0, 0, 0, 0.92),
-          0 3px 7px rgba(0, 0, 0, 0.78),
-          0 8px 18px rgba(0, 0, 0, 0.58) !important;
+          -2px -2px 0 rgba(0, 0, 0, 0.92),
+          0 -2px 0 rgba(0, 0, 0, 0.95),
+          2px -2px 0 rgba(0, 0, 0, 0.92),
+          -2px 0 0 rgba(0, 0, 0, 0.95),
+          2px 0 0 rgba(0, 0, 0, 0.95),
+          -2px 2px 0 rgba(0, 0, 0, 0.92),
+          0 2px 0 rgba(0, 0, 0, 0.95),
+          2px 2px 0 rgba(0, 0, 0, 0.92),
+          0 0 7px rgba(0, 0, 0, 1),
+          0 5px 12px rgba(0, 0, 0, 0.88),
+          0 14px 32px rgba(0, 0, 0, 0.76) !important;
         white-space: nowrap !important;
         opacity: 0 !important;
         pointer-events: none !important;
