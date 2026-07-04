@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Player Preferences Lite
 // @namespace    Citizen.youtube.player-preferences-lite
-// @version      1
+// @version      1.3
 // @description  Applies small YouTube player preferences without touching Enhancer-style miniplayer, queue, autoplay, or background playback controls.
 // @author       Citizen
 // @match        https://www.youtube.com/*
@@ -231,6 +231,8 @@
     "#description-inner",
     "#description-inline-expander",
     "ytd-text-inline-expander",
+    "ytd-watch-info-text",
+    "#info-container",
   ].join(",");
   const DESCRIPTION_EXPANDED_SELECTOR = [
     "ytd-watch-flexy ytd-watch-metadata ytd-text-inline-expander #expanded",
@@ -271,10 +273,13 @@
   ];
 
   let scheduled = false;
+  const pendingApplyRoots = new Set();
   let legacyActionHiddenCleared = false;
   let theaterModeUserDisabled = false;
   let highestQualityVideoKey = "";
   let highestQualityRetryTimers = [];
+  let theaterModeAttemptKey = "";
+  let playerLayoutRefreshScheduled = false;
   let rightButtonHeldOnPlayer = false;
   let suppressNextContextMenu = false;
   let volumeOverlayHideTimer = 0;
@@ -1622,6 +1627,26 @@
           width: 0 !important;
         }
 
+        ytd-watch-flexy[theater] #player-theater-container,
+        ytd-watch-flexy[theatre] #player-theater-container,
+        ytd-watch-flexy[is-watch-wide] #player-theater-container,
+        ytd-watch-flexy[theater] #player-container,
+        ytd-watch-flexy[theatre] #player-container,
+        ytd-watch-flexy[is-watch-wide] #player-container,
+        ytd-watch-flexy[theater] #player-container-inner,
+        ytd-watch-flexy[theatre] #player-container-inner,
+        ytd-watch-flexy[is-watch-wide] #player-container-inner,
+        ytd-watch-flexy[theater] #player,
+        ytd-watch-flexy[theatre] #player,
+        ytd-watch-flexy[is-watch-wide] #player,
+        ytd-watch-flexy[theater] #movie_player.html5-video-player:not(.ytp-fullscreen),
+        ytd-watch-flexy[theatre] #movie_player.html5-video-player:not(.ytp-fullscreen),
+        ytd-watch-flexy[is-watch-wide] #movie_player.html5-video-player:not(.ytp-fullscreen) {
+          box-sizing: border-box !important;
+          max-width: none !important;
+          width: 100% !important;
+        }
+
         ytd-watch-flexy #panels:has(ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-live-chat"]),
         ytd-watch-flexy ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-live-chat"],
         ytd-watch-flexy ytd-engagement-panel-section-list-renderer:has(ytd-live-chat-frame),
@@ -1700,11 +1725,36 @@
 
     if (style.textContent !== css) {
       style.textContent = css;
+      schedulePlayerLayoutRefreshAttempts();
     }
   }
 
   function getWatchFlexy() {
     return document.querySelector("ytd-watch-flexy");
+  }
+
+  function requestPlayerLayoutRefresh() {
+    if (!isWatchPath() || playerLayoutRefreshScheduled) {
+      return;
+    }
+
+    playerLayoutRefreshScheduled = true;
+    requestAnimationFrame(() => {
+      playerLayoutRefreshScheduled = false;
+      if (isWatchPath()) {
+        window.dispatchEvent(new Event("resize"));
+      }
+    });
+  }
+
+  function schedulePlayerLayoutRefreshAttempts() {
+    if (!isWatchPath()) {
+      return;
+    }
+
+    [0, 100, 500, 1200].forEach((delay) => {
+      setTimeout(requestPlayerLayoutRefresh, delay);
+    });
   }
 
   function isTheaterModeEnabled() {
@@ -1744,6 +1794,31 @@
     }
 
     sizeButton.click();
+    schedulePlayerLayoutRefreshAttempts();
+  }
+
+  function scheduleTheaterModeAttempts() {
+    if (
+      !CONFIG.enableTheaterMode ||
+      theaterModeUserDisabled ||
+      !isWatchPath()
+    ) {
+      return;
+    }
+
+    const videoKey = getVideoKey();
+    if (!videoKey || videoKey === theaterModeAttemptKey) {
+      return;
+    }
+
+    theaterModeAttemptKey = videoKey;
+    [300, 1200, 2500].forEach((delay) => {
+      setTimeout(() => {
+        if (theaterModeAttemptKey === videoKey) {
+          enableTheaterMode();
+        }
+      }, delay);
+    });
   }
 
   function handleTheaterModeToggle(event) {
@@ -2001,14 +2076,15 @@
     scheduleHighestQualityAttempts();
 
     if (isWatchPath()) {
-      setTimeout(enableTheaterMode, 300);
-      setTimeout(enableTheaterMode, 1200);
+      scheduleTheaterModeAttempts();
     }
   }
 
   function handleNavigateFinish() {
     theaterModeUserDisabled = false;
+    theaterModeAttemptKey = "";
     applyPreferences(document);
+    schedulePlayerLayoutRefreshAttempts();
   }
 
   function handleDescriptionClick(event) {
@@ -2024,7 +2100,63 @@
     });
   }
 
+  function getApplyRoot(root) {
+    if (!root) {
+      return null;
+    }
+
+    if (root.nodeType === Node.DOCUMENT_NODE) {
+      return document;
+    }
+
+    if (
+      root.nodeType === Node.TEXT_NODE ||
+      root.nodeType === Node.COMMENT_NODE
+    ) {
+      return root.parentElement || null;
+    }
+
+    return root.querySelectorAll ? root : null;
+  }
+
+  function addPendingApplyRoot(root) {
+    const applyRoot = getApplyRoot(root);
+    if (!applyRoot) {
+      return;
+    }
+
+    if (applyRoot === document) {
+      pendingApplyRoots.clear();
+      pendingApplyRoots.add(document);
+      return;
+    }
+
+    if (pendingApplyRoots.has(document)) {
+      return;
+    }
+
+    for (const pendingRoot of Array.from(pendingApplyRoots)) {
+      if (
+        pendingRoot !== applyRoot &&
+        pendingRoot.contains &&
+        pendingRoot.contains(applyRoot)
+      ) {
+        return;
+      }
+
+      if (
+        applyRoot.contains &&
+        applyRoot.contains(pendingRoot)
+      ) {
+        pendingApplyRoots.delete(pendingRoot);
+      }
+    }
+
+    pendingApplyRoots.add(applyRoot);
+  }
+
   function scheduleApply(root = document) {
+    addPendingApplyRoot(root);
     if (scheduled) {
       return;
     }
@@ -2032,32 +2164,82 @@
     scheduled = true;
     requestAnimationFrame(() => {
       scheduled = false;
-      applyPreferences(root);
+      const roots = Array.from(pendingApplyRoots);
+      pendingApplyRoots.clear();
+
+      if (!roots.length) {
+        return;
+      }
+
+      if (roots.includes(document)) {
+        applyPreferences(document);
+        return;
+      }
+
+      roots.forEach((applyRoot) => {
+        if (applyRoot.isConnected !== false) {
+          applyPreferences(applyRoot);
+        }
+      });
     });
   }
 
-  function shouldScheduleForMutation(mutation) {
-    if (mutation.addedNodes && mutation.addedNodes.length) {
+  function addMutationRoot(roots, root) {
+    const applyRoot = getApplyRoot(root);
+    if (applyRoot) {
+      roots.add(applyRoot);
+    }
+  }
+
+  function addScopedMutationRoot(roots, target) {
+    const actionRoot = closestElement(target, WATCH_ACTION_MUTATION_SELECTOR);
+    if (actionRoot) {
+      roots.add(actionRoot);
       return true;
     }
 
-    if (mutation.type !== "attributes" && mutation.type !== "characterData") {
-      return false;
+    return false;
+  }
+
+  function getMutationApplyRoots(mutation) {
+    const roots = new Set();
+
+    if (addScopedMutationRoot(roots, mutation.target)) {
+      return roots;
     }
 
-    return Boolean(
-      closestElement(mutation.target, WATCH_ACTION_MUTATION_SELECTOR),
-    );
+    if (mutation.addedNodes && mutation.addedNodes.length) {
+      const targetRoot = getApplyRoot(mutation.target);
+      if (
+        targetRoot &&
+        targetRoot !== document.documentElement &&
+        targetRoot !== document.body
+      ) {
+        roots.add(targetRoot);
+        return roots;
+      }
+
+      mutation.addedNodes.forEach((node) => {
+        if (!addScopedMutationRoot(roots, node)) {
+          addMutationRoot(roots, node);
+        }
+      });
+      return roots;
+    }
+
+    if (mutation.type !== "attributes" && mutation.type !== "characterData") {
+      return roots;
+    }
+
+    addScopedMutationRoot(roots, mutation.target);
+    return roots;
   }
 
   applyPreferences(document);
 
   const observer = new MutationObserver((mutations) => {
     for (const mutation of mutations) {
-      if (shouldScheduleForMutation(mutation)) {
-        scheduleApply(document);
-        break;
-      }
+      getMutationApplyRoots(mutation).forEach((root) => scheduleApply(root));
     }
   });
 
