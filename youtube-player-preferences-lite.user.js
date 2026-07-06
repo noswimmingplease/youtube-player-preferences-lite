@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Player Preferences Lite
 // @namespace    Citizen.youtube.player-preferences-lite
-// @version      1.4
+// @version      1.5
 // @description  Applies small YouTube player preferences without touching Enhancer-style miniplayer, queue, autoplay, or background playback controls.
 // @author       Citizen
 // @match        https://www.youtube.com/*
@@ -29,6 +29,7 @@
     hideMerchShelf: true,
     hideStatementBanners: true,
     hideMetadataTeaserCarousel: true,
+    hideInfoPanel: true,
     hideHashtags: true,
     collapseDescriptionBlankRows: true,
     hideStructuredDescription: true,
@@ -216,6 +217,10 @@
   const HASHTAG_TEXT_PATTERN = /(^|\s)#[^\s#]+/g;
   const HASHTAG_TEXT_TEST_PATTERN = /#[^\s#]+/;
   const HASHTAG_ONLY_LINE_PATTERN = /^\s*(?:#[^\s#]+\s*)+$/;
+  const DESCRIPTION_REPEATED_BLANK_LINE_PATTERN =
+    /(?:[ \t\u00a0]*\r?\n){2,}/g;
+  const DESCRIPTION_SEPARATOR_TEXT_ONLY_PATTERN = /^[ \t\r\n\u00a0]+$/;
+  const DESCRIPTION_SEPARATOR_TEXT_PATTERN = /[\r\n]|\u00a0{2,}/;
   const DESCRIPTION_TEXT_ROOT_SELECTOR = [
     "ytd-watch-flexy ytd-watch-metadata #description",
     "ytd-watch-flexy ytd-watch-metadata #description-inner",
@@ -342,6 +347,30 @@
     }
     root.querySelectorAll(selector).forEach((el) => elements.add(el));
     return elements;
+  }
+
+  function collectOutermostMatchingElements(root, selector) {
+    const elements = collectMatchingElements(root, selector);
+    return Array.from(elements).filter((el) => {
+      for (
+        let parent = el.parentElement;
+        parent;
+        parent = parent.parentElement
+      ) {
+        if (elements.has(parent)) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }
+
+  function collectDescriptionTextRoots(root = document) {
+    return collectOutermostMatchingElements(
+      root,
+      DESCRIPTION_TEXT_ROOT_SELECTOR,
+    );
   }
 
   function convertCurrentShortsPage() {
@@ -1150,28 +1179,268 @@
   }
 
   function removeHashtagText(root = document) {
-    collectMatchingElements(root, DESCRIPTION_TEXT_ROOT_SELECTOR).forEach(
-      (container) => {
-        const textNodes = [];
-        const walker = document.createTreeWalker(
-          container,
-          NodeFilter.SHOW_TEXT,
-          {
-            acceptNode(node) {
-              return HASHTAG_TEXT_TEST_PATTERN.test(node.textContent || "")
-                ? NodeFilter.FILTER_ACCEPT
-                : NodeFilter.FILTER_REJECT;
-            },
+    collectDescriptionTextRoots(root).forEach((container) => {
+      const textNodes = [];
+      const walker = document.createTreeWalker(
+        container,
+        NodeFilter.SHOW_TEXT,
+        {
+          acceptNode(node) {
+            return HASHTAG_TEXT_TEST_PATTERN.test(node.textContent || "")
+              ? NodeFilter.FILTER_ACCEPT
+              : NodeFilter.FILTER_REJECT;
           },
-        );
+        },
+      );
 
-        while (walker.nextNode()) {
-          textNodes.push(walker.currentNode);
-        }
+      while (walker.nextNode()) {
+        textNodes.push(walker.currentNode);
+      }
 
-        textNodes.forEach(removeHashtagTextNode);
-      },
+      textNodes.forEach(removeHashtagTextNode);
+    });
+  }
+
+  function isDescriptionBreakElement(node) {
+    return (
+      node &&
+      node.nodeType === Node.ELEMENT_NODE &&
+      ["BR", "WBR"].includes(node.tagName)
     );
+  }
+
+  function isDescriptionSeparatorTextNode(node) {
+    const text = node && node.textContent;
+    return (
+      node &&
+      node.nodeType === Node.TEXT_NODE &&
+      DESCRIPTION_SEPARATOR_TEXT_ONLY_PATTERN.test(text || "") &&
+      (DESCRIPTION_SEPARATOR_TEXT_PATTERN.test(text || "") ||
+        text.includes("\u00a0"))
+    );
+  }
+
+  function isDescriptionWhitespaceOnlyElement(node) {
+    return (
+      node &&
+      node.nodeType === Node.ELEMENT_NODE &&
+      !isDescriptionBreakElement(node) &&
+      !closestElement(node, DESCRIPTION_CONTROL_SELECTOR) &&
+      DESCRIPTION_SEPARATOR_TEXT_ONLY_PATTERN.test(node.textContent || "") &&
+      !node.querySelector("a[href], button, img, svg, video, yt-img-shadow")
+    );
+  }
+
+  function isDescriptionLineSeparatorNode(node) {
+    return (
+      (node &&
+        node.nodeType === Node.ELEMENT_NODE &&
+        node.tagName === "BR") ||
+      (node &&
+        DESCRIPTION_SEPARATOR_TEXT_PATTERN.test(node.textContent || ""))
+    );
+  }
+
+  function isDescriptionWhitespaceTextNode(node) {
+    return (
+      node &&
+      node.nodeType === Node.TEXT_NODE &&
+      DESCRIPTION_SEPARATOR_TEXT_ONLY_PATTERN.test(node.textContent || "")
+    );
+  }
+
+  function isDescriptionSeparatorNode(node) {
+    return (
+      isDescriptionBreakElement(node) ||
+      isDescriptionSeparatorTextNode(node) ||
+      (isDescriptionWhitespaceOnlyElement(node) &&
+        (isDescriptionLineSeparatorNode(node) ||
+          node.textContent.includes("\u00a0")))
+    );
+  }
+
+  function getDescriptionSeparatorBreakCount(node) {
+    const text = node && node.textContent;
+    if (!node) {
+      return 0;
+    }
+
+    if (node.nodeType === Node.ELEMENT_NODE && node.tagName === "BR") {
+      return 1;
+    }
+
+    const lineBreaks = String(text || "").match(/\r\n|\r|\n/g);
+    if (lineBreaks) {
+      return lineBreaks.length;
+    }
+
+    const nbspMatches = String(text || "").match(/\u00a0/g);
+    return nbspMatches ? nbspMatches.length : 0;
+  }
+
+  function getDescriptionSeparatorReplacement(separatorRun) {
+    const breakCount = separatorRun.reduce(
+      (count, node) => count + getDescriptionSeparatorBreakCount(node),
+      0,
+    );
+    const hasLineBreak = separatorRun.some(isDescriptionLineSeparatorNode);
+
+    if (!hasLineBreak && breakCount < 2) {
+      return null;
+    }
+
+    return breakCount > 1 ? "\n\n" : "\n";
+  }
+
+  function hasMeaningfulDescriptionNode(node) {
+    if (!node || closestElement(node, DESCRIPTION_CONTROL_SELECTOR)) {
+      return false;
+    }
+
+    if (node.nodeType === Node.TEXT_NODE) {
+      return Boolean(node.textContent.replace(/\u00a0/g, " ").trim());
+    }
+
+    if (node.nodeType !== Node.ELEMENT_NODE || isDescriptionBreakElement(node)) {
+      return false;
+    }
+
+    return Boolean(
+      getElementText(node) ||
+        node.querySelector("a[href], img, video, yt-img-shadow"),
+    );
+  }
+
+  function cleanDescriptionBlankLineText(text) {
+    return String(text || "").replace(
+      DESCRIPTION_REPEATED_BLANK_LINE_PATTERN,
+      "\n\n",
+    );
+  }
+
+  function normaliseDescriptionBlankLineTextNode(node) {
+    if (!node || isDescriptionSeparatorTextNode(node)) {
+      return;
+    }
+
+    const text = node.textContent || "";
+    const cleanedText = cleanDescriptionBlankLineText(text);
+    if (cleanedText !== text) {
+      node.textContent = cleanedText;
+    }
+  }
+
+  function normaliseDescriptionKeptSeparator(node, replacementText) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      node.textContent = replacementText;
+      return node;
+    }
+
+    if (isDescriptionWhitespaceOnlyElement(node)) {
+      node.textContent = replacementText;
+      return node;
+    }
+
+    if (!node.parentNode) {
+      return node;
+    }
+
+    const textNode = document.createTextNode(replacementText);
+    node.parentNode.insertBefore(textNode, node);
+    node.remove();
+    return textNode;
+  }
+
+  function normaliseDescriptionSeparatorRun(separatorRun, keepOne) {
+    if (!separatorRun.length) {
+      return;
+    }
+
+    const keeper =
+      separatorRun.find(isDescriptionLineSeparatorNode) || separatorRun[0];
+
+    if (keepOne) {
+      const replacementText =
+        getDescriptionSeparatorReplacement(separatorRun);
+      if (replacementText) {
+        normaliseDescriptionKeptSeparator(keeper, replacementText);
+      }
+    } else {
+      keeper.remove();
+    }
+
+    separatorRun.forEach((node) => {
+      if (node !== keeper) {
+        node.remove();
+      }
+    });
+  }
+
+  function normaliseDescriptionChildSeparators(parent) {
+    let separatorRun = [];
+    let seenContent = false;
+
+    Array.from(parent.childNodes).forEach((node) => {
+      if (
+        isDescriptionSeparatorNode(node) ||
+        (separatorRun.length &&
+          (isDescriptionWhitespaceTextNode(node) ||
+            isDescriptionWhitespaceOnlyElement(node)))
+      ) {
+        separatorRun.push(node);
+        return;
+      }
+
+      normaliseDescriptionSeparatorRun(
+        separatorRun,
+        seenContent && hasMeaningfulDescriptionNode(node),
+      );
+      separatorRun = [];
+
+      if (
+        node.nodeType === Node.ELEMENT_NODE &&
+        !closestElement(node, DESCRIPTION_CONTROL_SELECTOR)
+      ) {
+        normaliseDescriptionChildSeparators(node);
+      }
+
+      if (hasMeaningfulDescriptionNode(node)) {
+        seenContent = true;
+      }
+    });
+
+    normaliseDescriptionSeparatorRun(separatorRun, false);
+  }
+
+  function normaliseDescriptionBlankRows(root = document) {
+    if (!CONFIG.collapseDescriptionBlankRows || !isWatchPath()) {
+      return;
+    }
+
+    collectDescriptionTextRoots(root).forEach((container) => {
+      const textNodes = [];
+      const walker = document.createTreeWalker(
+        container,
+        NodeFilter.SHOW_TEXT,
+        {
+          acceptNode(node) {
+            DESCRIPTION_REPEATED_BLANK_LINE_PATTERN.lastIndex = 0;
+            return DESCRIPTION_REPEATED_BLANK_LINE_PATTERN.test(
+              node.textContent || "",
+            )
+              ? NodeFilter.FILTER_ACCEPT
+              : NodeFilter.FILTER_REJECT;
+          },
+        },
+      );
+
+      while (walker.nextNode()) {
+        textNodes.push(walker.currentNode);
+      }
+
+      textNodes.forEach(normaliseDescriptionBlankLineTextNode);
+      normaliseDescriptionChildSeparators(container);
+    });
   }
 
   function getMeaningfulDescriptionText(container) {
@@ -1369,6 +1638,7 @@
 
   function runDescriptionCleanup(root = document) {
     hideHashtags(root);
+    normaliseDescriptionBlankRows(root);
     collapseDescriptionBlankRows(root);
   }
 
@@ -1521,6 +1791,15 @@
     if (CONFIG.hideMetadataTeaserCarousel) {
       rules.push(`
         ytd-watch-flexy ytd-watch-metadata #teaser-carousel {
+          display: none !important;
+        }
+      `);
+    }
+
+    if (CONFIG.hideInfoPanel) {
+      rules.push(`
+        ytd-watch-flexy ytd-info-panel-container-renderer,
+        ytd-watch-flexy .ytd-info-panel-container-renderer {
           display: none !important;
         }
       `);
