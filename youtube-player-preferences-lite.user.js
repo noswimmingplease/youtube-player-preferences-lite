@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Player Preferences Lite
 // @namespace    Citizen.youtube.player-preferences-lite
-// @version      1.5
+// @version      1.6
 // @description  Applies small YouTube player preferences without touching Enhancer-style miniplayer, queue, autoplay, or background playback controls.
 // @author       Citizen
 // @match        https://www.youtube.com/*
@@ -226,8 +226,6 @@
     "ytd-watch-flexy ytd-watch-metadata #description-inner",
     "ytd-watch-flexy ytd-watch-metadata #description-inline-expander",
     "ytd-watch-flexy ytd-watch-metadata ytd-text-inline-expander",
-    "ytd-watch-flexy ytd-watch-metadata ytd-watch-info-text",
-    "ytd-watch-flexy ytd-video-primary-info-renderer",
   ].join(",");
   const HASHTAG_EMPTY_ANCESTOR_STOP_SELECTOR = [
     "ytd-watch-metadata",
@@ -236,7 +234,6 @@
     "#description-inner",
     "#description-inline-expander",
     "ytd-text-inline-expander",
-    "ytd-watch-info-text",
     "#info-container",
   ].join(",");
   const DESCRIPTION_EXPANDED_SELECTOR = [
@@ -263,6 +260,13 @@
     "ytd-button-renderer",
     "[role='button']",
   ].join(",");
+  const WATCH_INFO_TEXT_SELECTOR =
+    "ytd-watch-flexy ytd-watch-metadata ytd-watch-info-text";
+  const WATCH_INFO_NATIVE_CONTAINER_SELECTOR = "#info-container";
+  const WATCH_INFO_TOOLTIP_SELECTOR = "tp-yt-paper-tooltip #tooltip";
+  const WATCH_INFO_STATIC_TEXT_CLASS = "ytppl-watch-info-static-text";
+  const WATCH_INFO_NATIVE_HIDDEN_ATTRIBUTE =
+    "data-ytppl-watch-info-native-hidden";
   const QUALITY_LEVELS_HIGH_TO_LOW = [
     "highres",
     "hd4320",
@@ -1642,6 +1646,81 @@
     collapseDescriptionBlankRows(root);
   }
 
+  function cleanWatchInfoText(text) {
+    return String(text || "")
+      .replace(/\s*\u2022\s*/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function getWatchInfoFieldText(row, selector) {
+    const field = row.querySelector(selector);
+    if (!field) {
+      return "";
+    }
+
+    return cleanWatchInfoText(
+      field.getAttribute("aria-label") || field.textContent,
+    );
+  }
+
+  function getWatchInfoStaticText(row) {
+    const tooltipText = cleanWatchInfoText(
+      row.querySelector(WATCH_INFO_TOOLTIP_SELECTOR)?.textContent,
+    );
+    if (tooltipText) {
+      return tooltipText;
+    }
+
+    return [
+      getWatchInfoFieldText(row, "#view-count"),
+      getWatchInfoFieldText(row, "#date-text"),
+      getWatchInfoFieldText(row, "#info"),
+    ]
+      .filter(Boolean)
+      .join(" ");
+  }
+
+  function normaliseWatchInfoRow(row) {
+    if (!row || isExcludedSurface(row)) {
+      return;
+    }
+
+    const staticTextValue = getWatchInfoStaticText(row);
+    if (!staticTextValue) {
+      return;
+    }
+
+    let staticText = row.querySelector(`.${WATCH_INFO_STATIC_TEXT_CLASS}`);
+    const nativeContainer = row.querySelector(
+      WATCH_INFO_NATIVE_CONTAINER_SELECTOR,
+    );
+
+    if (!staticText) {
+      staticText = document.createElement("span");
+      staticText.className = WATCH_INFO_STATIC_TEXT_CLASS;
+      row.insertBefore(staticText, nativeContainer || row.firstChild);
+    }
+
+    if (staticText.textContent !== staticTextValue) {
+      staticText.textContent = staticTextValue;
+    }
+
+    if (nativeContainer) {
+      nativeContainer.setAttribute(WATCH_INFO_NATIVE_HIDDEN_ATTRIBUTE, "1");
+    }
+  }
+
+  function normaliseWatchInfoText(root = document) {
+    if (!isWatchPath()) {
+      return;
+    }
+
+    collectMatchingElements(root, WATCH_INFO_TEXT_SELECTOR).forEach(
+      normaliseWatchInfoRow,
+    );
+  }
+
   function buildVolumeOverlayCss() {
     return `
       .${VOLUME_OVERLAY_CLASS} {
@@ -1805,6 +1884,17 @@
       `);
     }
 
+    rules.push(`
+        ytd-watch-flexy ytd-watch-metadata ytd-watch-info-text .${WATCH_INFO_STATIC_TEXT_CLASS} {
+          display: inline !important;
+          white-space: normal !important;
+        }
+
+        ytd-watch-flexy ytd-watch-metadata ytd-watch-info-text ${WATCH_INFO_NATIVE_CONTAINER_SELECTOR}[${WATCH_INFO_NATIVE_HIDDEN_ATTRIBUTE}="1"] {
+          display: none !important;
+        }
+      `);
+
     if (CONFIG.collapseDescriptionBlankRows) {
       rules.push(`
         ${DESCRIPTION_EXPANDED_SELECTOR} {
@@ -1889,8 +1979,7 @@
 
         ytd-watch-flexy ytd-watch-metadata #description-inner.ytd-watch-metadata,
         ytd-watch-flexy ytd-watch-metadata #description-inline-expander.ytd-watch-metadata,
-        ytd-watch-flexy ytd-watch-metadata ytd-text-inline-expander,
-        ytd-watch-flexy ytd-watch-metadata ytd-watch-info-text {
+        ytd-watch-flexy ytd-watch-metadata ytd-text-inline-expander {
           box-sizing: border-box !important;
           max-width: 100% !important;
           min-width: 0 !important;
@@ -2359,6 +2448,7 @@
     hideWatchedVideos(root);
     normaliseReturnYoutubeLikeButtons(root);
     normaliseReturnYoutubeDislikeButtons(root);
+    normaliseWatchInfoText(root);
     runDescriptionCleanup(root);
     hideWatchActionButtons(root);
     hideWatchActionMenuItems(root);
@@ -2484,6 +2574,12 @@
     const actionRoot = closestElement(target, WATCH_ACTION_MUTATION_SELECTOR);
     if (actionRoot) {
       roots.add(actionRoot);
+      return true;
+    }
+
+    const watchInfoRoot = closestElement(target, WATCH_INFO_TEXT_SELECTOR);
+    if (watchInfoRoot) {
+      roots.add(watchInfoRoot);
       return true;
     }
 
