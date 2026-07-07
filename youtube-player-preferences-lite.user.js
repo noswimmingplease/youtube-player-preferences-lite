@@ -1464,28 +1464,12 @@
         .replace(/\s+/g, " ")
         .trim();
 
-      if (text && hasVisibleTextRange(walker.currentNode)) {
+      if (text) {
         parts.push(text);
       }
     }
 
     return parts.join(" ").trim();
-  }
-
-  function hasVisibleTextRange(node) {
-    const range = document.createRange();
-    try {
-      range.selectNodeContents(node);
-      return Array.from(range.getClientRects()).some(
-        (rect) => rect.width > 0 && rect.height > 0,
-      );
-    } catch {
-      return false;
-    } finally {
-      if (typeof range.detach === "function") {
-        range.detach();
-      }
-    }
   }
 
   function hasMeaningfulExpandedDescriptionContent(expanded) {
