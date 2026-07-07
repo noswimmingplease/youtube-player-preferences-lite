@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Player Preferences Lite
 // @namespace    Citizen.youtube.player-preferences-lite
-// @version      1.6
+// @version      1.7
 // @description  Applies small YouTube player preferences without touching Enhancer-style miniplayer, queue, autoplay, or background playback controls.
 // @author       Citizen
 // @match        https://www.youtube.com/*
@@ -1892,6 +1892,11 @@
 
         ytd-watch-flexy ytd-watch-metadata ytd-watch-info-text ${WATCH_INFO_NATIVE_CONTAINER_SELECTOR}[${WATCH_INFO_NATIVE_HIDDEN_ATTRIBUTE}="1"] {
           display: none !important;
+        }
+
+        ytd-watch-flexy ytd-watch-metadata ytd-watch-info-text tp-yt-paper-tooltip {
+          display: none !important;
+          pointer-events: none !important;
         }
       `);
 
