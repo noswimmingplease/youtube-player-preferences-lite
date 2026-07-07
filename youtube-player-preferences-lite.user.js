@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Player Preferences Lite
 // @namespace    Citizen.youtube.player-preferences-lite
-// @version      1.8
+// @version      1.10
 // @description  Applies small YouTube player preferences without touching Enhancer-style miniplayer, queue, autoplay, or background playback controls.
 // @author       Citizen
 // @match        https://www.youtube.com/*
@@ -2058,6 +2058,12 @@
 
     return `
         .html5-video-player .ytp-cards-button,
+        .html5-video-player .ytp-paid-content-overlay {
+          display: none !important;
+          opacity: 0 !important;
+          pointer-events: none !important;
+        }
+
         .html5-video-player .ytp-cards-teaser,
         .html5-video-player .ytp-ce-element,
         .html5-video-player .ytp-ce-covering-overlay,
@@ -2066,11 +2072,17 @@
         .html5-video-player .ytp-endscreen-content,
         .html5-video-player .ytp-endscreen-previous,
         .html5-video-player .ytp-endscreen-next,
-        .html5-video-player .ytp-endscreen-paginate,
-        .html5-video-player .ytp-paid-content-overlay {
-          display: none !important;
+        .html5-video-player .ytp-endscreen-paginate {
           opacity: 0 !important;
           pointer-events: none !important;
+        }
+
+        .html5-video-player .ytp-playlist-menu .ytp-ce-element,
+        .html5-video-player .ytp-playlist-menu .ytp-ce-covering-overlay,
+        .html5-video-player .ytp-playlist-menu .ytp-ce-expanding-overlay,
+        .html5-video-player .ytp-playlist-menu .ytp-ce-hide-button-container {
+          opacity: 1 !important;
+          pointer-events: auto !important;
         }
       `;
   }
