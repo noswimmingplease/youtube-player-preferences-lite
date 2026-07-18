@@ -1,9 +1,13 @@
 // ==UserScript==
 // @name         YouTube Player Preferences Lite
 // @namespace    Citizen.youtube.player-preferences-lite
-// @version      1.11
+// @version      1.22
 // @description  Applies small YouTube player preferences without touching Enhancer-style miniplayer, queue, autoplay, or background playback controls.
 // @author       Citizen
+// @homepageURL  https://github.com/Ci303/youtube-player-preferences-lite
+// @supportURL   https://github.com/Ci303/youtube-player-preferences-lite/issues
+// @updateURL    https://raw.githubusercontent.com/Ci303/youtube-player-preferences-lite/main/youtube-player-preferences-lite.user.js
+// @downloadURL  https://raw.githubusercontent.com/Ci303/youtube-player-preferences-lite/main/youtube-player-preferences-lite.user.js
 // @match        https://www.youtube.com/*
 // @run-at       document-idle
 // @grant        none
@@ -27,7 +31,7 @@
     hideInlineSaveButton: true,
     hideJoinButton: true,
     hideMerchShelf: true,
-    hideMembershipShelf: true,
+    hideBrandVideoShelf: true,
     hideStatementBanners: true,
     hideMetadataTeaserCarousel: true,
     hideInfoPanel: true,
@@ -37,7 +41,7 @@
     hideChat: true,
     hideInfoCardsAndEndScreens: true,
     enableTheaterMode: true,
-    enableHighestQuality: true,
+    enableHighestQuality: false,
     highestQualityRetryDelays: [0, 300, 1000, 2500, 5000, 10000],
     enablePlayerWheelVolume: true,
     requireRightMouseButtonForWheelVolume: true,
@@ -110,6 +114,15 @@
     WATCHED_PROGRESS_VALUE_SELECTOR,
   ].join(",");
   const WATCH_PATHS = ["/watch", "/live/"];
+  const LIVE_CHAT_FRAME_SELECTOR =
+    "ytd-watch-flexy ytd-live-chat-frame#chat";
+  const LIVE_CHAT_COLLAPSE_BUTTON_SELECTOR = [
+    "#show-hide-button #button",
+    "#show-hide-button button",
+    '#show-hide-button [role="button"]',
+  ].join(",");
+  const LIVE_CHAT_COLLAPSE_DELAYS_MS = [0, 300, 1200, 3000, 6000];
+  const LIVE_CHAT_COLLAPSE_PENDING_TIMEOUT_MS = 750;
   const EXCLUDED_SURFACE_SELECTOR = [
     "ytd-miniplayer",
     "ytd-miniplayer-ui",
@@ -173,8 +186,19 @@
   ];
   const WATCH_ACTION_MUTATION_SELECTOR = [
     "ytd-watch-flexy ytd-menu-renderer",
-    "ytd-popup-container",
-    "tp-yt-iron-dropdown",
+    WATCH_ACTION_MENU_ITEM_SELECTOR,
+  ].join(",");
+  const DYNAMIC_MUTATION_SURFACE_SELECTOR = [
+    FEED_CARD_CONTAINER_SELECTOR,
+    "ytd-rich-grid-media",
+    "ytd-rich-grid-slim-media",
+    "yt-lockup-view-model",
+    "yt-lockup-view-model-wiz",
+    SHORTS_LINK_SELECTOR,
+    WATCH_ACTION_MUTATION_SELECTOR,
+    "ytd-watch-flexy ytd-video-owner-renderer",
+    "ytd-watch-flexy ytd-watch-metadata",
+    "ytd-watch-flexy ytd-video-primary-info-renderer",
   ].join(",");
   const RYD_LIKE_BUTTON_SELECTOR = [
     "ytd-watch-flexy #segmented-like-button button",
@@ -290,6 +314,9 @@
   let highestQualityRetryTimers = [];
   let theaterModeAttemptKey = "";
   let playerLayoutRefreshScheduled = false;
+  let liveChatCollapseAttemptTimers = [];
+  let liveChatCollapsePendingTimer = 0;
+  let pendingLiveChatFrame = null;
   let rightButtonHeldOnPlayer = false;
   let suppressNextContextMenu = false;
   let volumeOverlayHideTimer = 0;
@@ -328,7 +355,15 @@
     }
 
     const match = url.pathname.match(/^\/shorts\/([^/?#]+)/);
-    return match ? decodeURIComponent(match[1]) : "";
+    if (!match) {
+      return "";
+    }
+
+    try {
+      return decodeURIComponent(match[1]);
+    } catch {
+      return "";
+    }
   }
 
   function getWatchUrlForShort(shortId) {
@@ -428,9 +463,26 @@
       return;
     }
 
+    const watchUrl = getWatchUrlForShort(shortId);
+    link.href = watchUrl;
+    link.dataset.ytpplShortsConverted = "1";
+
+    const opensOutsideCurrentTab =
+      event.defaultPrevented ||
+      event.button !== 0 ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.shiftKey ||
+      event.altKey ||
+      link.hasAttribute("download") ||
+      (link.target && link.target.toLowerCase() !== "_self");
+    if (opensOutsideCurrentTab) {
+      return;
+    }
+
     event.preventDefault();
     event.stopPropagation();
-    location.assign(getWatchUrlForShort(shortId));
+    location.assign(watchUrl);
   }
 
   function hasUpcomingStreamBadge(card) {
@@ -687,11 +739,12 @@
     }
 
     legacyActionHiddenCleared = true;
+    clearHiddenWatchActionItems(root);
+  }
+
+  function clearHiddenWatchActionItems(root = document) {
     collectMatchingElements(root, WATCH_ACTION_HIDDEN_SELECTOR).forEach(
-      (buttonModel) => {
-        delete buttonModel.dataset[WATCH_ACTION_HIDDEN_DATASET_KEY];
-        buttonModel.hidden = false;
-      },
+      (actionElement) => setWatchActionHidden(actionElement, false),
     );
   }
 
@@ -1008,6 +1061,9 @@
 
   function hideWatchActionMenuItems(root = document) {
     if (!isWatchPath()) {
+      // YouTube reuses popup menu elements between SPA routes. Remove this
+      // script's watch-page marker before a recycled item becomes a feed action.
+      clearHiddenWatchActionItems(root);
       return;
     }
 
@@ -1769,7 +1825,7 @@
   }
 
   function buildFeedCleanupCss() {
-    if (!CONFIG.hideMembershipShelf) {
+    if (!CONFIG.hideBrandVideoShelf) {
       return "";
     }
 
@@ -1883,16 +1939,6 @@
     }
 
     rules.push(`
-        ytd-watch-flexy ytd-watch-metadata a.ytAttributedStringLinkCallToActionColor,
-        ytd-watch-flexy ytd-video-primary-info-renderer a.ytAttributedStringLinkCallToActionColor,
-        ytd-watch-flexy ytd-structured-description-content-renderer a.ytAttributedStringLinkCallToActionColor,
-        ytd-watch-flexy yt-video-metadata-carousel-view-model a.ytAttributedStringLinkCallToActionColor,
-        ytd-watch-flexy .ytVideoMetadataCarouselViewModelHost a.ytAttributedStringLinkCallToActionColor {
-          display: none !important;
-        }
-      `);
-
-    rules.push(`
         ytd-watch-flexy ytd-watch-metadata ytd-watch-info-text .${WATCH_INFO_STATIC_TEXT_CLASS} {
           display: inline !important;
           white-space: normal !important;
@@ -1972,72 +2018,6 @@
     }
 
     return `
-        ytd-watch-flexy #below,
-        ytd-watch-flexy ytd-watch-metadata,
-        ytd-watch-flexy #bottom-row,
-        ytd-watch-flexy #top-row {
-          box-sizing: border-box !important;
-          max-width: 100% !important;
-          min-width: 0 !important;
-          width: 100% !important;
-        }
-
-        ytd-watch-flexy ytd-watch-metadata #description.ytd-watch-metadata {
-          box-sizing: border-box !important;
-          flex: 1 1 auto !important;
-          max-width: 100% !important;
-          min-width: 0 !important;
-          width: 100% !important;
-        }
-
-        ytd-watch-flexy ytd-watch-metadata #description-inner.ytd-watch-metadata,
-        ytd-watch-flexy ytd-watch-metadata #description-inline-expander.ytd-watch-metadata,
-        ytd-watch-flexy ytd-watch-metadata ytd-text-inline-expander {
-          box-sizing: border-box !important;
-          max-width: 100% !important;
-          min-width: 0 !important;
-          width: auto !important;
-        }
-
-        ytd-watch-flexy #secondary {
-          margin-top: 12px !important;
-          padding-top: 0 !important;
-        }
-
-        ytd-watch-flexy #secondary-inner {
-          margin-top: 0 !important;
-          padding-top: 0 !important;
-        }
-
-        ytd-watch-flexy #panels-full-bleed-container:empty,
-        ytd-watch-flexy #panels-full-bleed-container:not(:has(*)) {
-          display: none !important;
-          flex: 0 0 0 !important;
-          max-width: 0 !important;
-          min-width: 0 !important;
-          width: 0 !important;
-        }
-
-        ytd-watch-flexy[theater] #player-theater-container,
-        ytd-watch-flexy[theatre] #player-theater-container,
-        ytd-watch-flexy[is-watch-wide] #player-theater-container,
-        ytd-watch-flexy[theater] #player-container,
-        ytd-watch-flexy[theatre] #player-container,
-        ytd-watch-flexy[is-watch-wide] #player-container,
-        ytd-watch-flexy[theater] #player-container-inner,
-        ytd-watch-flexy[theatre] #player-container-inner,
-        ytd-watch-flexy[is-watch-wide] #player-container-inner,
-        ytd-watch-flexy[theater] #player,
-        ytd-watch-flexy[theatre] #player,
-        ytd-watch-flexy[is-watch-wide] #player,
-        ytd-watch-flexy[theater] #movie_player.html5-video-player:not(.ytp-fullscreen),
-        ytd-watch-flexy[theatre] #movie_player.html5-video-player:not(.ytp-fullscreen),
-        ytd-watch-flexy[is-watch-wide] #movie_player.html5-video-player:not(.ytp-fullscreen) {
-          box-sizing: border-box !important;
-          max-width: none !important;
-          width: 100% !important;
-        }
-
         ytd-watch-flexy #panels:has(ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-live-chat"]),
         ytd-watch-flexy ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-live-chat"],
         ytd-watch-flexy ytd-engagement-panel-section-list-renderer:has(ytd-live-chat-frame),
@@ -2159,6 +2139,112 @@
     [0, 100, 500, 1200].forEach((delay) => {
       setTimeout(requestPlayerLayoutRefresh, delay);
     });
+  }
+
+  function isLiveChatCollapsed(chatFrame) {
+    return Boolean(
+      chatFrame &&
+        (chatFrame.hasAttribute("collapsed") || chatFrame.collapsed === true),
+    );
+  }
+
+  function clearPendingLiveChatCollapse(chatFrame = null) {
+    if (chatFrame && pendingLiveChatFrame !== chatFrame) {
+      return;
+    }
+
+    if (liveChatCollapsePendingTimer) {
+      clearTimeout(liveChatCollapsePendingTimer);
+      liveChatCollapsePendingTimer = 0;
+    }
+
+    pendingLiveChatFrame = null;
+  }
+
+  function clearLiveChatCollapseAttempts() {
+    liveChatCollapseAttemptTimers.forEach((timerId) => clearTimeout(timerId));
+    liveChatCollapseAttemptTimers = [];
+    clearPendingLiveChatCollapse();
+  }
+
+  function verifyLiveChatCollapse(chatFrame) {
+    if (pendingLiveChatFrame !== chatFrame) {
+      return;
+    }
+
+    clearPendingLiveChatCollapse(chatFrame);
+    if (isLiveChatCollapsed(chatFrame)) {
+      schedulePlayerLayoutRefreshAttempts();
+    }
+  }
+
+  function collapseLiveChatIfExpanded() {
+    if (!CONFIG.hideChat || !isWatchPath()) {
+      return;
+    }
+
+    const chatFrame = document.querySelector(LIVE_CHAT_FRAME_SELECTOR);
+    if (!chatFrame) {
+      return;
+    }
+
+    if (isLiveChatCollapsed(chatFrame)) {
+      clearPendingLiveChatCollapse(chatFrame);
+      return;
+    }
+
+    if (pendingLiveChatFrame === chatFrame) {
+      return;
+    }
+
+    const collapseButton = chatFrame.querySelector(
+      LIVE_CHAT_COLLAPSE_BUTTON_SELECTOR,
+    );
+    if (
+      !collapseButton ||
+      typeof collapseButton.click !== "function" ||
+      collapseButton.disabled ||
+      collapseButton.getAttribute("aria-disabled") === "true"
+    ) {
+      return;
+    }
+
+    pendingLiveChatFrame = chatFrame;
+    try {
+      collapseButton.click();
+    } catch {
+      clearPendingLiveChatCollapse(chatFrame);
+      return;
+    }
+
+    liveChatCollapsePendingTimer = setTimeout(
+      () => verifyLiveChatCollapse(chatFrame),
+      LIVE_CHAT_COLLAPSE_PENDING_TIMEOUT_MS,
+    );
+  }
+
+  function scheduleLiveChatCollapseAttempts() {
+    liveChatCollapseAttemptTimers.forEach((timerId) => clearTimeout(timerId));
+    liveChatCollapseAttemptTimers = [];
+
+    if (!CONFIG.hideChat || !isWatchPath()) {
+      return;
+    }
+
+    liveChatCollapseAttemptTimers = LIVE_CHAT_COLLAPSE_DELAYS_MS.map((delay) =>
+      setTimeout(collapseLiveChatIfExpanded, delay),
+    );
+  }
+
+  function nodeContainsLiveChatFrame(node) {
+    if (!node || node.nodeType !== Node.ELEMENT_NODE) {
+      return false;
+    }
+
+    return (
+      node.matches(LIVE_CHAT_FRAME_SELECTOR) ||
+      Boolean(node.querySelector(LIVE_CHAT_FRAME_SELECTOR))
+    );
   }
 
   function isTheaterModeEnabled() {
@@ -2398,7 +2484,7 @@
   }
 
   function handleWheelVolume(event) {
-    if (!CONFIG.enablePlayerWheelVolume) {
+    if (!CONFIG.enablePlayerWheelVolume || event.deltaY === 0) {
       return;
     }
 
@@ -2455,19 +2541,23 @@
     if (!suppressNextContextMenu) {
       return;
     }
+
+    suppressNextContextMenu = false;
     if (!getPlayerFromTarget(event.target)) {
       return;
     }
 
-    suppressNextContextMenu = false;
     event.preventDefault();
     event.stopImmediatePropagation();
   }
 
-  function applyPreferences(root = document) {
+  function handleWindowBlur() {
+    rightButtonHeldOnPlayer = false;
+    suppressNextContextMenu = false;
+  }
+
+  function applyDynamicPreferences(root = document) {
     clearLegacyHiddenWatchActionButtons(root);
-    ensureStyles();
-    convertCurrentShortsPage();
     rewriteShortsLinks(root);
     hideUpcomingStreams(root);
     hidePayToWatchCards(root);
@@ -2478,7 +2568,14 @@
     runDescriptionCleanup(root);
     hideWatchActionButtons(root);
     hideWatchActionMenuItems(root);
+  }
+
+  function applyRoutePreferences() {
+    ensureStyles();
+    convertCurrentShortsPage();
+    applyDynamicPreferences(document);
     scheduleHighestQualityAttempts();
+    scheduleLiveChatCollapseAttempts();
 
     if (isWatchPath()) {
       scheduleTheaterModeAttempts();
@@ -2488,7 +2585,7 @@
   function handleNavigateFinish() {
     theaterModeUserDisabled = false;
     theaterModeAttemptKey = "";
-    applyPreferences(document);
+    applyRoutePreferences();
     schedulePlayerLayoutRefreshAttempts();
   }
 
@@ -2577,13 +2674,13 @@
       }
 
       if (roots.includes(document)) {
-        applyPreferences(document);
+        applyDynamicPreferences(document);
         return;
       }
 
       roots.forEach((applyRoot) => {
         if (applyRoot.isConnected !== false) {
-          applyPreferences(applyRoot);
+          applyDynamicPreferences(applyRoot);
         }
       });
     });
@@ -2596,45 +2693,46 @@
     }
   }
 
+  function getScopedMutationRoot(target) {
+    return closestElement(target, DYNAMIC_MUTATION_SURFACE_SELECTOR);
+  }
+
   function addScopedMutationRoot(roots, target) {
-    const actionRoot = closestElement(target, WATCH_ACTION_MUTATION_SELECTOR);
-    if (actionRoot) {
-      roots.add(actionRoot);
-      return true;
+    const scopedRoot = getScopedMutationRoot(target);
+    if (!scopedRoot) {
+      return false;
     }
 
-    const watchInfoRoot = closestElement(target, WATCH_INFO_TEXT_SELECTOR);
-    if (watchInfoRoot) {
-      roots.add(watchInfoRoot);
-      return true;
+    roots.add(scopedRoot);
+    return true;
+  }
+
+  function addAddedNodeMutationRoot(roots, node) {
+    if (addScopedMutationRoot(roots, node)) {
+      return;
     }
 
-    return false;
+    const applyRoot = getApplyRoot(node);
+    if (
+      applyRoot &&
+      applyRoot.querySelector &&
+      applyRoot.querySelector(DYNAMIC_MUTATION_SURFACE_SELECTOR)
+    ) {
+      addMutationRoot(roots, applyRoot);
+    }
   }
 
   function getMutationApplyRoots(mutation) {
     const roots = new Set();
 
-    if (addScopedMutationRoot(roots, mutation.target)) {
-      return roots;
-    }
-
     if (mutation.addedNodes && mutation.addedNodes.length) {
-      const targetRoot = getApplyRoot(mutation.target);
-      if (
-        targetRoot &&
-        targetRoot !== document.documentElement &&
-        targetRoot !== document.body
-      ) {
-        roots.add(targetRoot);
-        return roots;
-      }
-
       mutation.addedNodes.forEach((node) => {
-        if (!addScopedMutationRoot(roots, node)) {
-          addMutationRoot(roots, node);
-        }
+        addAddedNodeMutationRoot(roots, node);
       });
+
+      if (!roots.size) {
+        addScopedMutationRoot(roots, mutation.target);
+      }
       return roots;
     }
 
@@ -2646,10 +2744,17 @@
     return roots;
   }
 
-  applyPreferences(document);
+  applyRoutePreferences();
 
   const observer = new MutationObserver((mutations) => {
     for (const mutation of mutations) {
+      if (
+        mutation.addedNodes &&
+        Array.from(mutation.addedNodes).some(nodeContainsLiveChatFrame)
+      ) {
+        scheduleLiveChatCollapseAttempts();
+      }
+
       getMutationApplyRoots(mutation).forEach((root) => scheduleApply(root));
     }
   });
@@ -2673,10 +2778,28 @@
   document.addEventListener("mouseup", handleMouseUp, true);
   document.addEventListener("contextmenu", handleContextMenu, true);
 
+  window.addEventListener("blur", handleWindowBlur, true);
+  window.addEventListener(
+    "yt-navigate-start",
+    clearLiveChatCollapseAttempts,
+    true,
+  );
   window.addEventListener("yt-navigate-finish", handleNavigateFinish, true);
   window.addEventListener(
     "yt-page-data-updated",
-    () => applyPreferences(document),
+    () => {
+      scheduleApply(document);
+      scheduleLiveChatCollapseAttempts();
+    },
+    true,
+  );
+  window.addEventListener(
+    "pageshow",
+    () => {
+      ensureStyles();
+      scheduleLiveChatCollapseAttempts();
+      schedulePlayerLayoutRefreshAttempts();
+    },
     true,
   );
 })();

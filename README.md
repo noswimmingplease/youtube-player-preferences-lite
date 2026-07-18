@@ -8,7 +8,7 @@ Tampermonkey userscript that applies a small set of YouTube player preferences w
 - Hides Shorts shelves, Shorts cards, and Shorts guide entries.
 - Hides upcoming live-stream and pay-to-watch recommendation cards.
 - Hides the watch-page related recommendations renderer without touching playlist or queue panels.
-- Hides live chat, chat replay, and below-video live chat engagement panels.
+- Natively collapses live chat before hiding chat, chat replay, and below-video live chat engagement panels.
 - Hides volatile inline watch action buttons, including Save when YouTube promotes it beside like/dislike.
 - Hides info cards, paid-content overlays, and end-screen overlays.
 - Automatically enables YouTube theatre mode on watch/live pages.
@@ -36,34 +36,11 @@ Install Tampermonkey first, then install this userscript. Tampermonkey officiall
 
 ## Install This Script
 
-### Direct install from GitHub
+[Install YouTube Player Preferences Lite](https://raw.githubusercontent.com/Ci303/youtube-player-preferences-lite/main/youtube-player-preferences-lite.user.js)
 
-1. Open the latest release for this repository.
-2. Open or download `youtube-player-preferences-lite.user.js`.
-3. Tampermonkey should show an install page.
-4. Review the script, then select **Install**.
+Tampermonkey should open its installation page. Review the script, then select **Install**.
 
-### Import URL
-
-If your Tampermonkey build provides an import-from-URL option, use this release URL:
-
-~~~text
-https://github.com/Ci303/youtube-player-preferences-lite/releases/latest/download/youtube-player-preferences-lite.user.js
-~~~
-
-### Manual import
-
-1. Download `youtube-player-preferences-lite.user.js` from the latest release.
-2. Open the Tampermonkey Dashboard.
-3. Open the **Utilities** tab.
-4. Use the import option and select the downloaded `.user.js` file.
-
-### Copy and paste fallback
-
-1. Open the Tampermonkey Dashboard.
-2. Select **Create a new script**.
-3. Replace the template with the contents of `youtube-player-preferences-lite.user.js`.
-4. Save the script.
+For a manual import, use the same raw URL in Tampermonkey's import-from-URL tool.
 
 ## Scope
 
@@ -71,4 +48,4 @@ This script avoids `ytd-miniplayer`, playlist panels, and queue panels. If YouTu
 
 ## Updating
 
-For the most predictable result, reinstall from the latest GitHub release URL after changes are published.
+Tampermonkey checks the script's `@updateURL` and installs a newer published `@version` automatically. You can also check for userscript updates manually from the Tampermonkey Dashboard.
