@@ -9,7 +9,7 @@ Tampermonkey userscript that applies a small set of YouTube player preferences w
 - Hides upcoming live-stream and pay-to-watch recommendation cards.
 - Hides the watch-page related recommendations renderer without touching playlist or queue panels.
 - Natively collapses live chat before hiding chat, chat replay, and below-video live chat engagement panels.
-- Hides volatile inline watch action buttons, including Save when YouTube promotes it beside like/dislike.
+- Hides selected watch action buttons such as Ask, Thanks, and Share while preserving Like, Dislike, and Save.
 - Hides info cards, paid-content overlays, and end-screen overlays.
 - Automatically enables YouTube theatre mode on watch/live pages.
 - Adds mouse-wheel volume control over the player, only while holding the right mouse button.

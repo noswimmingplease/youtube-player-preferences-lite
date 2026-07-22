@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Player Preferences Lite
 // @namespace    Citizen.youtube.player-preferences-lite
-// @version      1.24
+// @version      1.25
 // @description  Applies small YouTube player preferences without touching Enhancer-style miniplayer, queue, autoplay, or background playback controls.
 // @author       Citizen
 // @homepageURL  https://github.com/Ci303/youtube-player-preferences-lite
@@ -28,7 +28,7 @@
     hideAskButton: true,
     hideThanksButton: true,
     hideShareButton: true,
-    hideInlineSaveButton: true,
+    hideInlineSaveButton: false,
     hideJoinButton: true,
     hideMerchShelf: true,
     hideBrandVideoShelf: true,
