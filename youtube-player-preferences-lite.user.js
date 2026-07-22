@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Player Preferences Lite
 // @namespace    Citizen.youtube.player-preferences-lite
-// @version      1.22
+// @version      1.24
 // @description  Applies small YouTube player preferences without touching Enhancer-style miniplayer, queue, autoplay, or background playback controls.
 // @author       Citizen
 // @homepageURL  https://github.com/Ci303/youtube-player-preferences-lite
@@ -1393,12 +1393,22 @@
 
   function normaliseDescriptionKeptSeparator(node, replacementText) {
     if (node.nodeType === Node.TEXT_NODE) {
-      node.textContent = replacementText;
+      if (node.textContent !== replacementText) {
+        node.textContent = replacementText;
+      }
       return node;
     }
 
     if (isDescriptionWhitespaceOnlyElement(node)) {
-      node.textContent = replacementText;
+      const onlyChild = node.firstChild;
+      const alreadyNormalised =
+        node.childNodes.length === 1 &&
+        onlyChild.nodeType === Node.TEXT_NODE &&
+        onlyChild.textContent === replacementText;
+
+      if (!alreadyNormalised) {
+        node.textContent = replacementText;
+      }
       return node;
     }
 
@@ -2709,7 +2719,7 @@
 
   function addAddedNodeMutationRoot(roots, node) {
     if (addScopedMutationRoot(roots, node)) {
-      return;
+      return true;
     }
 
     const applyRoot = getApplyRoot(node);
@@ -2719,44 +2729,53 @@
       applyRoot.querySelector(DYNAMIC_MUTATION_SURFACE_SELECTOR)
     ) {
       addMutationRoot(roots, applyRoot);
+      return true;
     }
+
+    return false;
   }
 
-  function getMutationApplyRoots(mutation) {
-    const roots = new Set();
-
+  function addMutationApplyRoots(roots, mutation) {
     if (mutation.addedNodes && mutation.addedNodes.length) {
+      let rootAdded = false;
+
       mutation.addedNodes.forEach((node) => {
-        addAddedNodeMutationRoot(roots, node);
+        if (addAddedNodeMutationRoot(roots, node)) {
+          rootAdded = true;
+        }
       });
 
-      if (!roots.size) {
+      if (!rootAdded) {
         addScopedMutationRoot(roots, mutation.target);
       }
-      return roots;
+      return;
     }
 
     if (mutation.type !== "attributes" && mutation.type !== "characterData") {
-      return roots;
+      return;
     }
 
     addScopedMutationRoot(roots, mutation.target);
-    return roots;
   }
 
   applyRoutePreferences();
 
   const observer = new MutationObserver((mutations) => {
+    const roots = new Set();
+
     for (const mutation of mutations) {
       if (
         mutation.addedNodes &&
+        mutation.addedNodes.length &&
         Array.from(mutation.addedNodes).some(nodeContainsLiveChatFrame)
       ) {
         scheduleLiveChatCollapseAttempts();
       }
 
-      getMutationApplyRoots(mutation).forEach((root) => scheduleApply(root));
+      addMutationApplyRoots(roots, mutation);
     }
+
+    roots.forEach((root) => scheduleApply(root));
   });
 
   observer.observe(document.documentElement, {
