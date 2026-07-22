@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Player Preferences Lite
 // @namespace    Citizen.youtube.player-preferences-lite
-// @version      1.26
+// @version      1.27
 // @description  Applies small YouTube player preferences without touching Enhancer-style miniplayer, queue, autoplay, or background playback controls.
 // @author       Citizen
 // @homepageURL  https://github.com/Ci303/youtube-player-preferences-lite
@@ -2091,7 +2091,15 @@
 
     return `
         .html5-video-player .ytp-cards-button,
-        .html5-video-player .ytp-paid-content-overlay {
+        .html5-video-player .ytp-paid-content-overlay,
+        .html5-video-player .ytp-endscreen-content,
+        .html5-video-player .ytp-endscreen-previous,
+        .html5-video-player .ytp-endscreen-next,
+        .html5-video-player .ytp-endscreen-paginate,
+        .html5-video-player .ytp-videowall-still,
+        .html5-video-player .ytp-modern-videowall-still,
+        .html5-video-player .ytp-fullscreen-grid-stills-container,
+        .html5-video-player .ytp-autonav-endscreen-upnext-container {
           display: none !important;
           opacity: 0 !important;
           pointer-events: none !important;
@@ -2101,11 +2109,7 @@
         .html5-video-player .ytp-ce-element,
         .html5-video-player .ytp-ce-covering-overlay,
         .html5-video-player .ytp-ce-expanding-overlay,
-        .html5-video-player .ytp-ce-hide-button-container,
-        .html5-video-player .ytp-endscreen-content,
-        .html5-video-player .ytp-endscreen-previous,
-        .html5-video-player .ytp-endscreen-next,
-        .html5-video-player .ytp-endscreen-paginate {
+        .html5-video-player .ytp-ce-hide-button-container {
           opacity: 0 !important;
           pointer-events: none !important;
         }
