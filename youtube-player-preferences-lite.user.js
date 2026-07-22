@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Player Preferences Lite
 // @namespace    Citizen.youtube.player-preferences-lite
-// @version      1.25
+// @version      1.26
 // @description  Applies small YouTube player preferences without touching Enhancer-style miniplayer, queue, autoplay, or background playback controls.
 // @author       Citizen
 // @homepageURL  https://github.com/Ci303/youtube-player-preferences-lite
@@ -20,6 +20,7 @@
   const CONFIG = {
     convertShortsToWatch: true,
     hideShorts: true,
+    useStandardMastheadLogo: true,
     hideUpcomingStreams: true,
     hidePayToWatchCards: true,
     hideWatchedVideos: true,
@@ -55,6 +56,8 @@
   const EMPTY_RYD_ICON_ATTRIBUTE = "data-ytppl-empty-ryd-icon";
   const SHORTS_LINK_SELECTOR =
     'a[href^="/shorts/"], a[href*="youtube.com/shorts/"]';
+  const TOPBAR_LOGO_RENDERER_SELECTOR =
+    "ytd-masthead ytd-topbar-logo-renderer";
   const FEED_CARD_CONTAINER_SELECTOR = [
     "ytd-rich-item-renderer",
     "ytd-video-renderer",
@@ -195,6 +198,7 @@
     "yt-lockup-view-model",
     "yt-lockup-view-model-wiz",
     SHORTS_LINK_SELECTOR,
+    TOPBAR_LOGO_RENDERER_SELECTOR,
     WATCH_ACTION_MUTATION_SELECTOR,
     "ytd-watch-flexy ytd-video-owner-renderer",
     "ytd-watch-flexy ytd-watch-metadata",
@@ -387,6 +391,31 @@
     }
     root.querySelectorAll(selector).forEach((el) => elements.add(el));
     return elements;
+  }
+
+  function useStandardMastheadLogo(root = document) {
+    if (!CONFIG.useStandardMastheadLogo) {
+      return;
+    }
+
+    collectMatchingElements(root, TOPBAR_LOGO_RENDERER_SELECTOR).forEach(
+      (renderer) => {
+        if (!renderer.logoEntity) {
+          return;
+        }
+
+        try {
+          // Let YouTube reveal its own logo and restore the normal Home command.
+          if (typeof renderer.set === "function") {
+            renderer.set("logoEntity", null);
+          } else {
+            renderer.logoEntity = null;
+          }
+        } catch {
+          // YouTube may replace the component while a mutation is being handled.
+        }
+      },
+    );
   }
 
   function collectOutermostMatchingElements(root, selector) {
@@ -2567,6 +2596,7 @@
   }
 
   function applyDynamicPreferences(root = document) {
+    useStandardMastheadLogo(root);
     clearLegacyHiddenWatchActionButtons(root);
     rewriteShortsLinks(root);
     hideUpcomingStreams(root);
@@ -2779,7 +2809,14 @@
   });
 
   observer.observe(document.documentElement, {
-    attributeFilter: ["aria-label", "class", "hidden", "style", "title"],
+    attributeFilter: [
+      "aria-label",
+      "class",
+      "hidden",
+      "show-yoodle",
+      "style",
+      "title",
+    ],
     attributes: true,
     childList: true,
     characterData: true,
