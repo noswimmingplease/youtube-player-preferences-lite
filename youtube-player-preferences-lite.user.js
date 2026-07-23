@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Player Preferences Lite
 // @namespace    Citizen.youtube.player-preferences-lite
-// @version      1.27
+// @version      1.28
 // @description  Applies small YouTube player preferences without touching Enhancer-style miniplayer, queue, autoplay, or background playback controls.
 // @author       Citizen
 // @homepageURL  https://github.com/Ci303/youtube-player-preferences-lite
@@ -334,6 +334,10 @@
 
   function isShortsPath() {
     return location.pathname.startsWith("/shorts/");
+  }
+
+  function isHistoryPath() {
+    return location.pathname === "/feed/history";
   }
 
   function isExcludedSurface(target) {
@@ -753,6 +757,16 @@
   }
 
   function hideWatchedVideos(root = document) {
+    if (isHistoryPath()) {
+      collectMatchingElements(
+        root,
+        '[data-ytppl-watched-hidden="1"]',
+      ).forEach((card) => {
+        setCardHidden(card, "ytpplWatchedHidden", false);
+      });
+      return;
+    }
+
     hideMatchingCards(
       root,
       CONFIG.hideWatchedVideos,
