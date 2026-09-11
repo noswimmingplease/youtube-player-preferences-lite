@@ -36,7 +36,7 @@ Install Tampermonkey first, then install this userscript. Tampermonkey officiall
 
 ## Install This Script
 
-[Install YouTube Player Preferences Lite](https://raw.githubusercontent.com/Ci303/youtube-player-preferences-lite/main/youtube-player-preferences-lite.user.js)
+[Install YouTube Player Preferences Lite](https://raw.githubusercontent.com/noswimmingplease/youtube-player-preferences-lite/main/youtube-player-preferences-lite.user.js)
 
 Tampermonkey should open its installation page. Review the script, then select **Install**.
 
